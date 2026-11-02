@@ -1,0 +1,56 @@
+# Private implementation specification (never publish)
+Memora_AI_Codex_Implementation_Spec*
+**/Memora_AI_Codex_Implementation_Spec*
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+.npmrc
+.pypirc
+credentials*.json
+service-account*.json
+.aws/
+secrets/
+
+# Dependencies and generated output
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.tsbuildinfo
+dist/
+build/
+.vite/
+.cache/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+coverage/
+playwright-report/
+test-results/
+
+# Private runtime files and databases
+data/
+storage/
+uploads/
+logs/
+*.log
+*.db
+*.sqlite*
+dump.rdb
+appendonlydir/
+
+# Editor and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

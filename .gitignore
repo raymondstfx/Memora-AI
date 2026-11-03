@@ -38,8 +38,8 @@ coverage/
 playwright-report/
 test-results/
 
-# Local verification sources (owner requested exclusion from future commits).
-# Already tracked tests remain tracked; stage publication files explicitly.
+# Local verification sources (owner requested exclusion from public repository).
+# Test sources/runners are retained on disk but removed from the Git index.
 /backend/tests/
 /frontend/tests/
 /scripts/test*.py

@@ -116,6 +116,10 @@ See [Gemini setup and measured verification](docs/evals/gemini-compatibility.md)
 
 ## Verify with your real API credentials
 
+The optional `scripts/verify_live_*.py` tools below are retained only in the
+owner's local workspace. They are not distributed in a fresh public checkout;
+manual browser verification remains available without them.
+
 1. Open `http://localhost:5173`; the configuration notice should disappear.
 2. Send a question and observe streamed text, then reload. Create another
    conversation and switch back; histories should remain separate.
@@ -197,6 +201,14 @@ reserved characters in passwords, or use URL-safe local credentials.
 
 ## Verification
 
+At the owner's request, test source directories, synthetic test providers and
+test/live-verification runners are excluded from the public branch and retained
+locally. The test commands and results in this guide and historical reports
+describe that local verification workspace. A fresh public checkout does not
+contain these suites; `scripts/dev.py check` requires those local test sources
+for its pytest step. Frontend `npm run check` / `npm run build`, backend Ruff/mypy,
+API schema generation and normal application startup remain available.
+
 With the repository virtual environment active, from the root:
 
 ```sh
@@ -261,7 +273,7 @@ and [implementation plan](docs/architecture/phase-0-plan.md).
 | `backend/app/agents` | LangGraph completion, checkpoint adapter and future tool contracts |
 | `backend/app/services` | Scoped chat and LLM provider adapter |
 | `backend/alembic` | Versioned database migrations |
-| `backend/tests` | Unit and real infrastructure tests |
+| `backend/tests` | Local-only unit/infrastructure tests; excluded from public branch |
 | `scripts` | Portable dev and acceptance commands |
 | `docs` | Architecture, API contract and verification evidence |
 

@@ -140,12 +140,12 @@ No automatic RQ requeue, automatic index rebuild or provider/model fallback exis
 
 ## Verification commands and evidence
 
-Publication note: at the owner's request, new verification/test sources and local
-changes to previously tracked test runners are excluded from this publication.
-The commands and results below record the verified local workspace; the new
-Gemini verifier and test cases are not included in a fresh public checkout.
-Previously published tests remain in Git history; this update does not remove
-them or claim that ignored files already tracked by Git become untracked.
+Publication note: at the owner's request, test sources, synthetic test providers
+and test/live-verification runners are removed from the current public branch
+and retained locally. The commands/results below record that local verification
+workspace; a fresh public checkout does not contain these suites. Previously
+published tests remain in historical commits; this cleanup does not rewrite
+history. Application source, migrations, dependency locks and API contracts remain.
 
 Final checks actually executed:
 

@@ -13,6 +13,11 @@ class JsonFormatter(logging.Formatter):
                 "request_id": getattr(record, "request_id", None),
                 "status_code": getattr(record, "status_code", None),
                 "duration_ms": getattr(record, "duration_ms", None),
+                "conversation_id": getattr(record, "conversation_id", None),
+                "message_id": getattr(record, "message_id", None),
+                "message_status": getattr(record, "message_status", None),
+                "error_code": getattr(record, "error_code", None),
+                "output_chars": getattr(record, "output_chars", None),
             }
         )
 

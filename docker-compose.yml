@@ -43,6 +43,39 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:5173","http://127.0.0.1:5173"]}
       DEPENDENCY_TIMEOUT_SECONDS: ${DEPENDENCY_TIMEOUT_SECONDS:-3}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai_compatible}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.openai.com/v1}
+      LLM_TOKEN_PARAMETER: ${LLM_TOKEN_PARAMETER:-max_completion_tokens}
+      LLM_MAX_OUTPUT_TOKENS: ${LLM_MAX_OUTPUT_TOKENS:-1024}
+      LLM_CONTEXT_TOKEN_BUDGET: ${LLM_CONTEXT_TOKEN_BUDGET:-12000}
+      LLM_CONNECT_TIMEOUT_SECONDS: ${LLM_CONNECT_TIMEOUT_SECONDS:-5}
+      LLM_READ_TIMEOUT_SECONDS: ${LLM_READ_TIMEOUT_SECONDS:-30}
+      LLM_TOTAL_TIMEOUT_SECONDS: ${LLM_TOTAL_TIMEOUT_SECONDS:-120}
+      LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-1}
+      LLM_MAX_CONCURRENT_REQUESTS: ${LLM_MAX_CONCURRENT_REQUESTS:-2}
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-openai_compatible}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-https://api.openai.com/v1}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-}
+      EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-0}
+      EMBEDDING_SEND_DIMENSIONS: ${EMBEDDING_SEND_DIMENSIONS:-true}
+      EMBEDDING_TIMEOUT_SECONDS: ${EMBEDDING_TIMEOUT_SECONDS:-30}
+      EMBEDDING_MAX_RETRIES: ${EMBEDDING_MAX_RETRIES:-1}
+      EMBEDDING_BATCH_SIZE: ${EMBEDDING_BATCH_SIZE:-16}
+      STORAGE_ROOT: /data/private
+      PDF_MAX_UPLOAD_BYTES: ${PDF_MAX_UPLOAD_BYTES:-20971520}
+      PDF_MAX_PAGES: ${PDF_MAX_PAGES:-100}
+      PDF_MAX_TEXT_CHARS: ${PDF_MAX_TEXT_CHARS:-1000000}
+      PDF_PARSE_TIMEOUT_SECONDS: ${PDF_PARSE_TIMEOUT_SECONDS:-30}
+      PDF_CHUNK_TOKENS: ${PDF_CHUNK_TOKENS:-600}
+      PDF_CHUNK_OVERLAP: ${PDF_CHUNK_OVERLAP:-100}
+      PDF_MAX_CHUNKS: ${PDF_MAX_CHUNKS:-2000}
+      INGEST_JOB_TIMEOUT_SECONDS: ${INGEST_JOB_TIMEOUT_SECONDS:-300}
+      INGEST_MAX_ACTIVE_JOBS: ${INGEST_MAX_ACTIVE_JOBS:-3}
+      RAG_TOP_K: ${RAG_TOP_K:-5}
+      RAG_MIN_SIMILARITY: ${RAG_MIN_SIMILARITY:-0.35}
     command: [alembic, upgrade, head]
     depends_on:
       postgres:
@@ -54,6 +87,8 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     environment: *backend-env
+    volumes:
+      - private_files:/data/private
     ports:
       - "127.0.0.1:${API_PORT:-8000}:8000"
     depends_on:
@@ -66,6 +101,28 @@ services:
       interval: 5s
       timeout: 6s
       retries: 12
+    restart: unless-stopped
+
+  worker:
+    profiles: [app]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment: *backend-env
+    volumes:
+      - private_files:/data/private
+    command: [python, -m, app.workers.run]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, python, -m, app.workers.health]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    mem_limit: 1g
     restart: unless-stopped
 
   frontend:
@@ -88,3 +145,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  private_files:

@@ -15,10 +15,14 @@ def run(*args: str) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=["api", "migrate", "check", "export-api"])
+    parser.add_argument(
+        "command", choices=["api", "worker", "migrate", "check", "export-api"]
+    )
     args = parser.parse_args()
     if args.command == "api":
         run("-m", "uvicorn", "app.main:app", "--reload", "--host", "127.0.0.1")
+    elif args.command == "worker":
+        run("-m", "app.workers.run")
     elif args.command == "migrate":
         run("-m", "alembic", "upgrade", "head")
     elif args.command == "export-api":

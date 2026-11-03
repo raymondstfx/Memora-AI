@@ -3,7 +3,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /app
 COPY backend/requirements.lock ./requirements.lock
 RUN pip install --no-cache-dir -r requirements.lock
-RUN useradd --create-home memora
+RUN useradd --create-home memora && mkdir -p /data/private && chown memora:memora /data/private
 COPY --chown=memora:memora backend/ ./
 USER memora
 EXPOSE 8000

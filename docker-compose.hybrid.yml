@@ -1,0 +1,5 @@
+# Local FastAPI/Vite with containerized RQ worker. Shares host-private files.
+services:
+  worker:
+    volumes:
+      - ./data/private:/data/private

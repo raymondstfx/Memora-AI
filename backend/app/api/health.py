@@ -11,7 +11,7 @@ from starlette.concurrency import run_in_threadpool
 from app.core.errors import error_response
 from app.schemas.health import Dependencies, ErrorResponse, HealthResponse
 
-SCHEMA_REVISION = "0001_infrastructure"
+SCHEMA_REVISION = "0003_pdf"
 router = APIRouter(prefix="/api", tags=["infrastructure"])
 
 

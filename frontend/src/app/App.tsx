@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import {
   ArrowUpRight,
   BookOpen,
@@ -19,6 +19,11 @@ import { HealthPanel } from "../features/health/HealthPanel";
 import { Button } from "../components/ui/button";
 import { ChatPanel } from "../features/chat/ChatPanel";
 import { MeetingPanel } from "../features/meetings/MeetingPanel";
+const PresentationPanel = lazy(() =>
+  import("../features/presentations/PresentationPanel").then((m) => ({
+    default: m.PresentationPanel,
+  })),
+);
 import { MemoryPanel } from "../features/memory/MemoryPanel";
 import { ActionsPanel } from "../features/meetings/ActionsPanel";
 import { KnowledgePanel } from "../features/knowledge/KnowledgePanel";
@@ -53,7 +58,7 @@ const pages = [
     phase: 4,
     text: "Keep the context that matters.",
     detail:
-      "Durable facts, provenance and a history of changes arrive in Phase 4.",
+      "Durable facts, provenance and a history of changes arrive in Phase 5.",
   },
   {
     title: "Tasks & Actions",
@@ -139,7 +144,7 @@ export function App() {
             <div className="progress-track">
               <span />
             </div>
-            <small>Phase 4 of 6</small>
+            <small>Phase 5 of 6</small>
           </div>
           <a
             className="help-link"
@@ -176,7 +181,7 @@ export function App() {
             <strong>{active}</strong>
           </div>
           <span className="phase-badge">
-            <span className="status-dot" /> Phase 4 · Evidence & memory
+            <span className="status-dot" /> Phase 5 · Research & presentations
           </span>
         </header>
         <main id="main">
@@ -190,16 +195,19 @@ export function App() {
                 "Meetings",
                 "Tasks & Actions",
                 "Memory",
+                "Presentations",
               ].includes(active)
                 ? active === "Meetings"
                   ? "Meeting intelligence"
-                  : active === "Tasks & Actions"
-                    ? "Reviewed actions"
-                    : active === "Memory"
-                      ? "Evidence-backed memory"
-                      : active === "Knowledge Base"
-                        ? "PDF knowledge"
-                        : "Streaming chat"
+                  : active === "Presentations"
+                    ? "Editable slides & previews"
+                    : active === "Tasks & Actions"
+                      ? "Reviewed actions"
+                      : active === "Memory"
+                        ? "Evidence-backed memory"
+                        : active === "Knowledge Base"
+                          ? "PDF knowledge"
+                          : "Streaming chat"
                 : page.phase === 0
                   ? "Infrastructure"
                   : `Planned · Phase ${page.phase}`}
@@ -214,6 +222,7 @@ export function App() {
             "Meetings",
             "Tasks & Actions",
             "Memory",
+            "Presentations",
           ].includes(active) && (
             <section className="welcome-card">
               <div className="welcome-copy">
@@ -251,6 +260,11 @@ export function App() {
           {active === "Chat" && <ChatPanel />}
           {active === "Meetings" && <MeetingPanel />}
           {active === "Memory" && <MemoryPanel />}
+          {active === "Presentations" && (
+            <Suspense fallback={<p role="status">Loading presentations…</p>}>
+              <PresentationPanel />
+            </Suspense>
+          )}
           {active === "Tasks & Actions" && <ActionsPanel />}
           {active === "Knowledge Base" && (
             <KnowledgePanel
@@ -268,7 +282,8 @@ export function App() {
             active !== "Knowledge Base" &&
             active !== "Meetings" &&
             active !== "Tasks & Actions" &&
-            active !== "Memory" && (
+            active !== "Memory" &&
+            active !== "Presentations" && (
               <section className="empty-state">
                 <span className="empty-icon">
                   <Icon size={25} strokeWidth={1.5} />

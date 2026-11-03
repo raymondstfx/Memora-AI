@@ -8,11 +8,13 @@ export function CitationCards({ sources }: { sources: Citation[] }) {
         <a
           key={source.key}
           href={
-            source.meeting_id
-              ? `/api/meetings/${source.meeting_id}/transcript`
-              : source.conversation_id
-                ? `/api/conversations/${source.conversation_id}/messages`
-                : `/api/documents/${source.document_id}/file#page=${source.page_no}`
+            source.url
+              ? source.url
+              : source.meeting_id
+                ? `/api/meetings/${source.meeting_id}/transcript`
+                : source.conversation_id
+                  ? `/api/conversations/${source.conversation_id}/messages`
+                  : `/api/documents/${source.document_id}/file#page=${source.page_no}`
           }
           target="_blank"
           rel="noreferrer"
@@ -20,23 +22,28 @@ export function CitationCards({ sources }: { sources: Citation[] }) {
         >
           <strong>
             [{source.label}] {source.filename} ·{" "}
-            {source.meeting_id
-              ? `Lines ${source.line_start}–${source.line_end}`
-              : source.conversation_id
-                ? "Saved message"
-                : `Page ${source.page_no}`}
+            {source.url
+              ? "Web source"
+              : source.meeting_id
+                ? `Lines ${source.line_start}–${source.line_end}`
+                : source.conversation_id
+                  ? "Saved message"
+                  : `Page ${source.page_no}`}
           </strong>
           <small>
-            {source.source_type === "user_correction"
-              ? "User correction · original source retained"
-              : source.meeting_id
-                ? "Meeting evidence"
-                : source.conversation_id
-                  ? "Explicit chat assertion"
-                  : "Internal PDF evidence"}
+            {source.url
+              ? "External web evidence"
+              : source.source_type === "user_correction"
+                ? "User correction · original source retained"
+                : source.meeting_id
+                  ? "Meeting evidence"
+                  : source.conversation_id
+                    ? "Explicit chat assertion"
+                    : "Internal PDF evidence"}
             {source.occurred_at
               ? ` · ${new Date(source.occurred_at).toISOString()}`
               : ""}
+            {source.retrieved_at ? ` · Retrieved ${source.retrieved_at}` : ""}
           </small>
           <blockquote>{source.excerpt}</blockquote>
         </a>

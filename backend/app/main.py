@@ -20,6 +20,8 @@ from app.agents.checkpoints import ThreadedPostgresSaver
 from app.api.chat import router as chat_router
 from app.api.documents import router as documents_router
 from app.api.health import router
+from app.api.meetings import router as meetings_router
+from app.api.memories import router as memories_router
 from app.core.config import Settings, get_settings
 from app.core.errors import error_response, install_error_handlers
 from app.core.logging import configure_logging
@@ -28,7 +30,10 @@ from app.db.session import build_engine
 from app.schemas.chat import StreamEvent
 from app.services.chat import ChatService
 from app.services.documents import DocumentService
+from app.services.emails import EmailService
 from app.services.llm.provider import OpenAICompatibleProvider
+from app.services.meetings import MeetingService
+from app.services.memories import MemoryService
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -66,14 +71,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             open=False,
         )
         app.state.checkpoint_pool.open()
+        app.state.documents = DocumentService(app.state.engine, config)
+        app.state.meetings = MeetingService(app.state.engine, config)
+        app.state.emails = EmailService(app.state.engine, config)
+        app.state.memories = MemoryService(app.state.engine, config)
         app.state.chat = ChatService(
             app.state.engine,
             config,
-            OpenAICompatibleProvider(config, app.state.http),
+            OpenAICompatibleProvider(config, app.state.http, app.state.documents.redis),
             ThreadedPostgresSaver(app.state.checkpoint_pool),
         )
-        app.state.documents = DocumentService(app.state.engine, config)
         app.state.chat.documents = app.state.documents
+        app.state.chat.memories = app.state.memories
         app.state.redis = Redis.from_url(
             config.redis_url.get_secret_value(),
             socket_connect_timeout=config.dependency_timeout_seconds,
@@ -92,14 +101,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             await asyncio.to_thread(app.state.checkpoint_pool.close)
             await app.state.redis.aclose()
             app.state.documents.redis.close()
+            app.state.meetings.redis.close()
+            app.state.emails.redis.close()
             app.state.engine.dispose()
 
     app = FastAPI(title="Memora AI API", version="0.1.0", lifespan=lifespan)
-    app.add_middleware(UploadLimit, max_bytes=config.pdf_max_upload_bytes)
+    app.add_middleware(
+        UploadLimit,
+        max_bytes=config.pdf_max_upload_bytes,
+        meeting_max_bytes=config.meeting_max_upload_bytes,
+    )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=config.cors_origins,
-        allow_methods=["GET", "POST", "DELETE"],
+        allow_methods=["GET", "POST", "PATCH", "DELETE"],
         allow_headers=["Content-Type"],
         expose_headers=["X-Request-ID"],
     )
@@ -131,6 +146,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(router)
     app.include_router(chat_router)
     app.include_router(documents_router)
+    app.include_router(meetings_router)
+    app.include_router(memories_router)
 
     def openapi() -> dict[str, Any]:
         if app.openapi_schema is None:

@@ -64,7 +64,7 @@ class DocumentService:
         self, db: Session, owner: UUID, identifier: UUID, lock: bool = False
     ) -> Document:
         query = select(Document).where(
-            Document.id == identifier, Document.user_id == owner
+            Document.id == identifier, Document.user_id == owner, Document.kind == "PDF"
         )
         row = db.scalar(query.with_for_update() if lock else query)
         if row is None:
@@ -85,7 +85,7 @@ class DocumentService:
                 self.out(row)
                 for row in db.scalars(
                     select(Document)
-                    .where(Document.user_id == owner)
+                    .where(Document.user_id == owner, Document.kind == "PDF")
                     .order_by(Document.created_at.desc())
                 )
             ]
@@ -483,7 +483,9 @@ class DocumentService:
                 identifiers = list(
                     db.scalars(
                         select(Document.id).where(
-                            Document.user_id == owner, Document.status == "ready"
+                            Document.user_id == owner,
+                            Document.status == "ready",
+                            Document.kind == "PDF",
                         )
                     )
                 )
@@ -509,6 +511,7 @@ class DocumentService:
                     Document.user_id == owner,
                     Document.id.in_(identifiers),
                     Document.status == "ready",
+                    Document.kind == "PDF",
                     Document.embedding_profile == profile(self.settings),
                     DocumentChunk.embedding_profile == profile(self.settings),
                     DocumentChunk.embedding_dimensions

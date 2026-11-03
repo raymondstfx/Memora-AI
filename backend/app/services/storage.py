@@ -5,11 +5,13 @@ from pathlib import Path, PurePosixPath
 from app.services.llm.provider import ChatError
 
 
-def safe_filename(filename: str) -> str:
+def safe_filename(filename: str, extension: str = ".pdf") -> str:
     name = PurePosixPath(filename.replace("\\", "/")).name
     name = unicodedata.normalize("NFKC", name)
     name = re.sub(r"[^\w. ()-]", "_", name).strip(". ")
-    return (name[:170] or "upload") + ("" if name.lower().endswith(".pdf") else ".pdf")
+    return (name[:170] or "upload") + (
+        "" if name.lower().endswith(extension) else extension
+    )
 
 
 class PrivateStorage:

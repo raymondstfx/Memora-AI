@@ -174,3 +174,208 @@ class Job(Timestamps, Base):
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     embedding_profile: Mapped[str] = mapped_column(String(64))
     reparse: Mapped[bool] = mapped_column(default=False)
+
+
+class Meeting(Timestamps, Base):
+    __tablename__ = "meetings"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    document_id: Mapped[UUID] = mapped_column(ForeignKey("documents.id"), unique=True)
+    title: Mapped[str] = mapped_column(String(180))
+    occurred_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    timezone: Mapped[str | None] = mapped_column(String(80))
+    location: Mapped[str | None] = mapped_column(String(300))
+    summary: Mapped[str] = mapped_column(Text, default="")
+    analysis_json: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
+    analysis_status: Mapped[str] = mapped_column(String(30), default="queued")
+    metadata_json: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
+
+    @property
+    def date_precision(self) -> str:
+        return str(self.metadata_json.get("date_precision", "unknown"))
+
+
+class Decision(Timestamps, Base):
+    __tablename__ = "decisions"
+    __table_args__ = (UniqueConstraint("meeting_id", "dedupe_key"),)
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    meeting_id: Mapped[UUID] = mapped_column(ForeignKey("meetings.id"), index=True)
+    text: Mapped[str] = mapped_column(Text)
+    evidence_json: Mapped[dict[str, object]] = mapped_column(JSON)
+    dedupe_key: Mapped[str] = mapped_column(String(64))
+
+
+class Risk(Timestamps, Base):
+    __tablename__ = "risks"
+    __table_args__ = (UniqueConstraint("meeting_id", "dedupe_key"),)
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    meeting_id: Mapped[UUID] = mapped_column(ForeignKey("meetings.id"), index=True)
+    type: Mapped[str] = mapped_column(String(30))
+    title: Mapped[str] = mapped_column(String(300))
+    severity: Mapped[str] = mapped_column(String(20))
+    rationale: Mapped[str] = mapped_column(Text)
+    mitigation: Mapped[str] = mapped_column(Text)
+    evidence_json: Mapped[dict[str, object]] = mapped_column(JSON)
+    confidence: Mapped[float] = mapped_column()
+    status: Mapped[str] = mapped_column(String(30), default="needs_review")
+    dedupe_key: Mapped[str] = mapped_column(String(64))
+
+
+class Task(Timestamps, Base):
+    __tablename__ = "tasks"
+    __table_args__ = (
+        UniqueConstraint("user_id", "dedupe_key"),
+        CheckConstraint(
+            "status IN ('proposed','open','in_progress','done','cancelled')",
+            name="ck_task_status",
+        ),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    meeting_id: Mapped[UUID] = mapped_column(ForeignKey("meetings.id"), index=True)
+    risk_id: Mapped[UUID | None] = mapped_column(ForeignKey("risks.id"))
+    title: Mapped[str] = mapped_column(String(300))
+    owner_name: Mapped[str | None] = mapped_column(String(150))
+    due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    due_text: Mapped[str | None] = mapped_column(String(200))
+    status: Mapped[str] = mapped_column(String(30), default="proposed", index=True)
+    needs_review: Mapped[bool] = mapped_column(default=True)
+    evidence_json: Mapped[dict[str, object]] = mapped_column(JSON)
+    dedupe_key: Mapped[str] = mapped_column(String(64))
+
+
+class EmailOutbox(Timestamps, Base):
+    __tablename__ = "email_outbox"
+    __table_args__ = (UniqueConstraint("user_id", "idempotency_key"),)
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    meeting_id: Mapped[UUID] = mapped_column(ForeignKey("meetings.id"), index=True)
+    risk_id: Mapped[UUID] = mapped_column(ForeignKey("risks.id"), unique=True)
+    recipients_json: Mapped[list[str]] = mapped_column(JSON, default=list)
+    subject: Mapped[str] = mapped_column(String(300))
+    body: Mapped[str] = mapped_column(Text)
+    revision: Mapped[int] = mapped_column(Integer, default=1)
+    approval_status: Mapped[str] = mapped_column(String(30), default="draft")
+    send_status: Mapped[str] = mapped_column(String(30), default="draft", index=True)
+    idempotency_key: Mapped[UUID | None] = mapped_column(Uuid)
+    approved_revision: Mapped[int | None] = mapped_column(Integer)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    provider_message_id: Mapped[str | None] = mapped_column(String(200))
+    error_code: Mapped[str | None] = mapped_column(String(60))
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class AuditEvent(Base):
+    __tablename__ = "audit_events"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    action: Mapped[str] = mapped_column(String(80))
+    resource_type: Mapped[str] = mapped_column(String(30))
+    resource_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    metadata_json: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class EmailApproval(Base):
+    __tablename__ = "email_approvals"
+    __table_args__ = (UniqueConstraint("user_id", "idempotency_key"),)
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    email_id: Mapped[UUID] = mapped_column(ForeignKey("email_outbox.id"), index=True)
+    idempotency_key: Mapped[UUID] = mapped_column(Uuid)
+    revision: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class Entity(Timestamps, Base):
+    __tablename__ = "entities"
+    __table_args__ = (UniqueConstraint("user_id", "type", "normalized_name"),)
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    type: Mapped[str] = mapped_column(String(30))
+    canonical_name: Mapped[str] = mapped_column(String(180))
+    normalized_name: Mapped[str] = mapped_column(String(180))
+    revision: Mapped[int] = mapped_column(Integer, default=1)
+    merged_into_id: Mapped[UUID | None] = mapped_column(ForeignKey("entities.id"))
+
+
+class EntityAlias(Timestamps, Base):
+    __tablename__ = "entity_aliases"
+    __table_args__ = (UniqueConstraint("user_id", "type", "normalized_name"),)
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    entity_id: Mapped[UUID] = mapped_column(ForeignKey("entities.id"), index=True)
+    type: Mapped[str] = mapped_column(String(30))
+    name: Mapped[str] = mapped_column(String(180))
+    normalized_name: Mapped[str] = mapped_column(String(180))
+    confirmed_by_user: Mapped[bool] = mapped_column(default=False)
+
+
+class Memory(Timestamps, Base):
+    __tablename__ = "memories"
+    __table_args__ = (
+        UniqueConstraint("user_id", "source_key"),
+        Index("ix_memory_search", "search_tsv", postgresql_using="gin"),
+        Index(
+            "ix_memory_slot_time",
+            "user_id",
+            "subject_entity_id",
+            "slot_key",
+            "valid_from",
+        ),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    subject_entity_id: Mapped[UUID] = mapped_column(
+        ForeignKey("entities.id"), index=True
+    )
+    predicate: Mapped[str] = mapped_column(String(50))
+    slot_key: Mapped[str] = mapped_column(String(120))
+    value_json: Mapped[dict[str, object]] = mapped_column(JSON)
+    memory_type: Mapped[str] = mapped_column(String(30))
+    valid_from: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    valid_to: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    observed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    source_type: Mapped[str] = mapped_column(String(30))
+    source_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    meeting_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("meetings.id"), index=True
+    )
+    message_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("messages.id"), index=True
+    )
+    evidence_quote: Mapped[str] = mapped_column(Text)
+    line_start: Mapped[int | None] = mapped_column(Integer)
+    line_end: Mapped[int | None] = mapped_column(Integer)
+    confidence: Mapped[float] = mapped_column()
+    evidence_kind: Mapped[str] = mapped_column(String(30))
+    lifecycle: Mapped[str] = mapped_column(String(30), default="recorded")
+    review_state: Mapped[str] = mapped_column(String(30))
+    status: Mapped[str] = mapped_column(String(30), index=True)
+    revision: Mapped[int] = mapped_column(Integer, default=1)
+    supersedes_id: Mapped[UUID | None] = mapped_column(ForeignKey("memories.id"))
+    correction_reason: Mapped[str | None] = mapped_column(Text)
+    source_key: Mapped[str] = mapped_column(String(64))
+    search_text: Mapped[str] = mapped_column(Text)
+    search_tsv: Mapped[object] = mapped_column(
+        TSVECTOR, Computed("to_tsvector('simple', search_text)", persisted=True)
+    )
+
+
+class EntityRelation(Timestamps, Base):
+    __tablename__ = "entity_relations"
+    __table_args__ = (UniqueConstraint("memory_id", "relation"),)
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    from_entity_id: Mapped[UUID] = mapped_column(ForeignKey("entities.id"), index=True)
+    to_entity_id: Mapped[UUID] = mapped_column(ForeignKey("entities.id"), index=True)
+    relation: Mapped[str] = mapped_column(String(50))
+    memory_id: Mapped[UUID] = mapped_column(ForeignKey("memories.id"), index=True)

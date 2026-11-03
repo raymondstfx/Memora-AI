@@ -55,15 +55,23 @@ class DocumentConfiguration(BaseModel):
 class SourceCitation(BaseModel):
     key: str
     label: int
-    chunk_id: UUID
-    document_id: UUID
+    chunk_id: UUID | None = None
+    document_id: UUID | None = None
     filename: str
-    page_no: int
+    page_no: int | None = None
     excerpt: str
     source_type: str = "internal_document"
     score: float
     vector_rank: int | None = None
     text_rank: int | None = None
+    meeting_id: UUID | None = None
+    memory_id: UUID | None = None
+    occurred_at: datetime | None = None
+    line_start: int | None = None
+    line_end: int | None = None
+    memory_status: str | None = None
+    conversation_id: UUID | None = None
+    message_id: UUID | None = None
 
 
 class SearchRequest(BaseModel):

@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import json
 from collections.abc import AsyncIterator
 from typing import Protocol
@@ -6,6 +7,7 @@ from urllib.parse import urlsplit
 
 import httpx
 from pydantic import BaseModel, Field, ValidationError
+from redis import Redis
 
 from app.core.config import Settings
 from app.schemas.chat import ChatConfiguration
@@ -76,14 +78,52 @@ class Chunk(BaseModel):
 
 
 class OpenAICompatibleProvider:
-    def __init__(self, settings: Settings, client: httpx.AsyncClient) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        client: httpx.AsyncClient,
+        admission: Redis | None = None,
+    ) -> None:
         self.settings, self.client = settings, client
         self.slots = asyncio.Semaphore(settings.llm_max_concurrent_requests)
+        self.admission = admission
 
     async def stream(self, messages: list[dict[str, str]]) -> AsyncIterator[str]:
         async with self.slots:
-            async for token in self._stream(messages):
-                yield token
+            lock = None
+            if self.admission is not None:
+                key = hashlib.sha256(
+                    (self.settings.llm_base_url + self.settings.llm_model).encode()
+                ).hexdigest()
+                try:
+                    for slot in range(self.settings.llm_max_concurrent_requests):
+                        candidate = self.admission.lock(
+                            f"memora:llm:slot:{key}:{slot}",
+                            timeout=self.settings.llm_total_timeout_seconds + 30,
+                            blocking=False,
+                            thread_local=False,
+                        )
+                        if await asyncio.to_thread(candidate.acquire):
+                            lock = candidate
+                            break
+                except Exception as exc:
+                    raise ChatError(
+                        "LLM_ADMISSION_UNAVAILABLE",
+                        "Check Redis before retrying model access.",
+                        503,
+                    ) from exc
+                if lock is None:
+                    raise ChatError(
+                        "LLM_BUSY",
+                        "Model concurrency limit reached. Retry explicitly.",
+                        429,
+                    )
+            try:
+                async for token in self._stream(messages):
+                    yield token
+            finally:
+                if lock:
+                    await asyncio.to_thread(lock.release)
 
     async def _stream(self, messages: list[dict[str, str]]) -> AsyncIterator[str]:
         config = configuration(self.settings)

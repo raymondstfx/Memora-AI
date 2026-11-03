@@ -21,6 +21,7 @@ from app.schemas.chat import ChatRequest, ConversationOut, MessageOut, StreamEve
 from app.schemas.documents import SourceCitation
 from app.services.documents import DocumentService
 from app.services.llm.provider import ChatError, Provider, configuration
+from app.services.memories import MemoryService
 from app.services.rag import grounded_answer
 
 
@@ -100,6 +101,7 @@ class ChatService:
         self.started_at = datetime.now(UTC)
         self.tasks: dict[UUID, asyncio.Task[None]] = {}
         self.documents: DocumentService | None = None
+        self.memories: MemoryService | None = None
 
     def recover(self, db: Session, user_id: UUID) -> None:
         # One API process is supported in demo mode. A restart never replays calls.
@@ -370,6 +372,8 @@ class ChatService:
             async with asyncio.timeout(self.settings.llm_total_timeout_seconds):
                 if turn.document_ids:
                     tokens = self.rag_tokens(turn, queue)
+                elif self.memories:
+                    tokens = self.memory_tokens(turn, queue)
                 else:
                     tokens = stream_graph(
                         self.provider,
@@ -538,6 +542,87 @@ class ChatService:
                 self.settings.llm_context_token_budget,
             )
         # Cite only evidence accepted by validation, never unverified model IDs.
+        for source in turn.sources:
+            await queue.put(
+                StreamEvent(
+                    event="citation",
+                    conversation_id=turn.conversation_id,
+                    message_id=turn.message_id,
+                    source=source.model_dump(mode="json"),
+                )
+            )
+        for offset in range(0, len(text), 40):
+            yield text[offset : offset + 40]
+
+    async def memory_tokens(
+        self, turn: Turn, queue: asyncio.Queue[StreamEvent | None]
+    ) -> AsyncIterator[str]:
+        assert self.memories
+        await asyncio.to_thread(
+            self.memories.ingest_chat, turn.user_id, turn.message_id
+        )
+        result = await asyncio.to_thread(
+            self.memories.recall, turn.user_id, turn.prompt[-1]["content"]
+        )
+        if not result.direct and not result.sources:
+            async for token in stream_graph(
+                self.provider,
+                self.saver,
+                f"{turn.user_id}:{turn.conversation_id}",
+                turn.prompt,
+            ):
+                yield token
+            return
+        await queue.put(
+            StreamEvent(
+                event="tool_start",
+                conversation_id=turn.conversation_id,
+                message_id=turn.message_id,
+                message="Searching owned memory and dated source evidence.",
+            )
+        )
+        turn.tool_calls = [
+            {
+                "name": "search_memories",
+                "memory_ids": [str(value) for value in result.memory_ids],
+                "mode": "temporal_sql" if result.direct else "full_text",
+            }
+        ]
+        await queue.put(
+            StreamEvent(
+                event="tool_result",
+                conversation_id=turn.conversation_id,
+                message_id=turn.message_id,
+                message=f"Retrieved {len(result.sources)} memory sources.",
+            )
+        )
+        if result.direct:
+            # A factual SQL rendering, never simulated model output or a fallback.
+            text, turn.sources = (
+                result.answer or "No supporting stored fact.",
+                result.sources,
+            )
+        else:
+            parent = self
+
+            class CheckpointedProvider:
+                async def stream(
+                    self, messages: list[dict[str, str]]
+                ) -> AsyncIterator[str]:
+                    async for token in stream_graph(
+                        parent.provider,
+                        parent.saver,
+                        f"{turn.user_id}:{turn.conversation_id}",
+                        messages,
+                    ):
+                        yield token
+
+            text, turn.sources = await grounded_answer(
+                CheckpointedProvider(),
+                turn.prompt[-1]["content"],
+                result.sources,
+                self.settings.llm_context_token_budget,
+            )
         for source in turn.sources:
             await queue.put(
                 StreamEvent(

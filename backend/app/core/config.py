@@ -63,6 +63,20 @@ class Settings(BaseSettings):
     ingest_max_active_jobs: int = Field(default=3, ge=1, le=10)
     rag_top_k: int = Field(default=5, ge=1, le=8)
     rag_min_similarity: float = Field(default=0.35, ge=0, le=1)
+    meeting_max_upload_bytes: int = Field(default=65536, ge=1024, le=262144)
+    meeting_max_input_bytes: int = Field(default=8000, ge=1000, le=24000)
+    meeting_max_output_tokens: int = Field(default=3000, ge=512, le=8192)
+    meeting_repair_attempts: int = Field(default=1, ge=0, le=1)
+    smtp_mode: Literal["disabled", "local", "external"] = "disabled"
+    smtp_host: str = ""
+    smtp_port: int = Field(default=587, ge=1, le=65535)
+    smtp_username: str = ""
+    smtp_password: SecretStr = SecretStr("")
+    smtp_from: str = "memora@example.test"
+    smtp_security: Literal["none", "starttls", "ssl"] = "starttls"
+    smtp_timeout_seconds: int = Field(default=10, ge=1, le=30)
+    smtp_external_send_enabled: bool = False
+    demo_allowed_recipients: str = ""
 
     @field_validator("embedding_dimensions", mode="before")
     @classmethod

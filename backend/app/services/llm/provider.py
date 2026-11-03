@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from app.core.config import Settings
 from app.schemas.chat import ChatConfiguration
+from app.services.provider_limits import rate_limit, retry_delay
 
 
 class ChatError(Exception):
@@ -77,8 +78,14 @@ class Chunk(BaseModel):
 class OpenAICompatibleProvider:
     def __init__(self, settings: Settings, client: httpx.AsyncClient) -> None:
         self.settings, self.client = settings, client
+        self.slots = asyncio.Semaphore(settings.llm_max_concurrent_requests)
 
     async def stream(self, messages: list[dict[str, str]]) -> AsyncIterator[str]:
+        async with self.slots:
+            async for token in self._stream(messages):
+                yield token
+
+    async def _stream(self, messages: list[dict[str, str]]) -> AsyncIterator[str]:
         config = configuration(self.settings)
         if not config.configured:
             raise ChatError("LLM_NOT_CONFIGURED", config.message, 503)
@@ -99,20 +106,40 @@ class OpenAICompatibleProvider:
                         self.settings.llm_token_parameter: (
                             self.settings.llm_max_output_tokens
                         ),
+                        **(
+                            {"reasoning_effort": self.settings.llm_reasoning_effort}
+                            if self.settings.llm_reasoning_effort
+                            else {}
+                        ),
                     },
                 ) as response:
+                    if response.status_code >= 400:
+                        await response.aread()
+                    delay = retry_delay(
+                        response, attempt, self.settings.provider_retry_max_wait_seconds
+                    )
                     if (
-                        response.status_code in (429, 502, 503, 504)
+                        delay is not None
                         and not emitted
                         and attempt < self.settings.llm_max_retries
                     ):
-                        await asyncio.sleep(0.5 * (2**attempt))
+                        await asyncio.sleep(delay)
                         continue
+                    if response.status_code == 429:
+                        limit = rate_limit(response)
+                        raise ChatError("PROVIDER_" + limit.reason, limit.message, 429)
                     if response.status_code in (401, 403):
                         raise ChatError(
                             "PROVIDER_AUTH_ERROR",
                             "Provider rejected credentials. Check LLM_API_KEY "
                             "and model permissions.",
+                        )
+                    if response.status_code == 404:
+                        raise ChatError(
+                            "PROVIDER_MODEL_UNAVAILABLE",
+                            "Model/endpoint unavailable (HTTP 404). Check LLM_MODEL, "
+                            "Base URL and project model access. Configure an "
+                            "accessible model explicitly; no fallback was called.",
                         )
                     if response.status_code >= 400:
                         raise ChatError(

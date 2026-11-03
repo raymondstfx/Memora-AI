@@ -3,6 +3,10 @@
 Phase 2 continuation note (November 3, 2026): real-model acceptance is still
 **pending verification**. No real Key was supplied or used during Phase 2.
 
+Subsequent Gemini follow-up: the owner supplied local credentials and authorized
+a bounded live smoke test. The requested `gemini-2.5-flash-lite` returned HTTP 404;
+no live model gate passed. See [the Gemini report](gemini-compatibility.md).
+
 Date: November 2, 2026 (Asia/Shanghai).
 
 ## Status and scope

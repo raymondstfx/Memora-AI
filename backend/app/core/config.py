@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     dependency_timeout_seconds: int = Field(default=3, ge=1, le=10)
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     llm_provider: str = "openai_compatible"
+    llm_reasoning_effort: Literal["", "none", "minimal", "low", "medium", "high"] = ""
+    provider_retry_max_wait_seconds: float = Field(default=15, ge=0, le=30)
     llm_api_key: SecretStr = SecretStr("")
     llm_model: str = ""
     llm_base_url: str = "https://api.openai.com/v1"
@@ -44,6 +46,11 @@ class Settings(BaseSettings):
     embedding_timeout_seconds: int = Field(default=30, ge=1, le=120)
     embedding_max_retries: int = Field(default=1, ge=0, le=2)
     embedding_batch_size: int = Field(default=16, ge=1, le=64)
+    embedding_normalize: bool = False
+    embedding_max_input_bytes: int = Field(default=0, ge=0, le=12000)
+    embedding_max_concurrent_requests: int = Field(default=1, ge=1, le=4)
+    embedding_min_interval_seconds: float = Field(default=4, ge=0, le=60)
+    embedding_cache_ttl_seconds: int = Field(default=86400, ge=60, le=604800)
     storage_root: Path = ROOT / "data" / "private"
     pdf_max_upload_bytes: int = Field(default=20971520, ge=1024, le=52428800)
     pdf_max_pages: int = Field(default=100, ge=1, le=500)

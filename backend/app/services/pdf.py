@@ -26,7 +26,7 @@ class ChunkText:
 
 
 def chunk_pages(
-    pages: list[str], size: int, overlap: int, max_chunks: int
+    pages: list[str], size: int, overlap: int, max_chunks: int, max_bytes: int = 0
 ) -> list[ChunkText]:
     result: list[ChunkText] = []
     for page_no, raw in enumerate(pages, 1):
@@ -39,8 +39,16 @@ def chunk_pages(
                 "OCR/blank-page review is required.",
                 422,
             )
-        for start in range(0, len(matches), size - overlap):
+        start = 0
+        while start < len(matches):
             stop = min(start + size, len(matches))
+            while (
+                max_bytes
+                and stop > start + 1
+                and len(text[matches[start].start() : matches[stop - 1].end()].encode())
+                > max_bytes
+            ):
+                stop -= 1
             content = text[matches[start].start() : matches[stop - 1].end()]
             result.append(
                 ChunkText(
@@ -57,6 +65,8 @@ def chunk_pages(
                 )
             if stop == len(matches):
                 break
+            # Byte limits may shrink chunks; cap overlap to avoid tiny strides.
+            start = stop - min(overlap, (stop - start) // 4)
     return result
 
 

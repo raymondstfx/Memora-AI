@@ -2,6 +2,13 @@
 
 Date: November 3, 2026 (Asia/Shanghai).
 
+Gemini follow-up: see [the measured compatibility report](gemini-compatibility.md).
+Four real requests were subsequently authorized and sent. Real 768-dimensional
+Embedding ingestion/storage and hybrid retrieval passed on a tiny PDF; the
+requested chat model returned HTTP 404. Full Phase 1 real-model and Phase 2 RAG
+acceptance remain pending. The keyless baseline below is the original handoff
+record, not a claim that the later live smoke test was never attempted.
+
 ## Scope and acceptance status
 
 Phase 2 implementation and credential-independent acceptance are complete.

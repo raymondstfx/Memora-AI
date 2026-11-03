@@ -38,6 +38,13 @@ coverage/
 playwright-report/
 test-results/
 
+# Local verification sources (owner requested exclusion from future commits).
+# Already tracked tests remain tracked; stage publication files explicitly.
+/backend/tests/
+/frontend/tests/
+/scripts/test*.py
+/scripts/verify_live_*.py
+
 # Private runtime files and databases
 data/
 storage/

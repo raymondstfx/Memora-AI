@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.core.config import Settings
 from app.schemas.documents import DocumentConfiguration
 from app.services.llm.provider import ChatError
+from app.services.provider_limits import rate_limit, retry_delay
 
 
 def profile(settings: Settings) -> str:
@@ -21,6 +22,7 @@ def profile(settings: Settings) -> str:
                 settings.embedding_base_url.rstrip("/"),
                 settings.embedding_model,
                 settings.embedding_dimensions,
+                *(["l2-normalized-v1"] if settings.embedding_normalize else []),
             ]
         ).encode()
     ).hexdigest()
@@ -78,7 +80,7 @@ class EmbeddingProvider(Protocol):
 
 class EmbeddingItem(BaseModel):
     model_config = ConfigDict(allow_inf_nan=False)
-    index: int = Field(ge=0)
+    index: int | None = Field(default=None, ge=0)
     embedding: list[float]
 
 
@@ -96,6 +98,16 @@ class OpenAIEmbeddingProvider:
             raise ChatError("EMBEDDING_NOT_CONFIGURED", config.message, 503)
         if not texts or any(not value.strip() for value in texts):
             raise ChatError("EMBEDDING_EMPTY_INPUT", "Cannot embed empty text.", 422)
+        if self.settings.embedding_max_input_bytes and any(
+            len(value.encode()) > self.settings.embedding_max_input_bytes
+            for value in texts
+        ):
+            raise ChatError(
+                "EMBEDDING_INPUT_LIMIT",
+                "Embedding input exceeds the conservative byte budget. "
+                "Shorten the query or explicitly reparse/reindex this PDF.",
+                422,
+            )
         owned = self.client is None
         client = self.client or httpx.Client(
             timeout=httpx.Timeout(self.settings.embedding_timeout_seconds, connect=5),
@@ -118,12 +130,15 @@ class OpenAIEmbeddingProvider:
                     },
                     json=body,
                 )
-                if (
-                    response.status_code in (429, 502, 503, 504)
-                    and attempt < self.settings.embedding_max_retries
-                ):
-                    time.sleep(0.5 * 2**attempt)
+                delay = retry_delay(
+                    response, attempt, self.settings.provider_retry_max_wait_seconds
+                )
+                if delay is not None and attempt < self.settings.embedding_max_retries:
+                    time.sleep(delay)
                     continue
+                if response.status_code == 429:
+                    limit = rate_limit(response)
+                    raise ChatError("EMBEDDING_" + limit.reason, limit.message, 429)
                 if response.status_code in (401, 403):
                     raise ChatError(
                         "EMBEDDING_AUTH_ERROR",
@@ -137,7 +152,24 @@ class OpenAIEmbeddingProvider:
                     )
                 try:
                     data = EmbeddingResponse.model_validate(response.json()).data
-                    data.sort(key=lambda item: item.index)
+                    # Gemini compatibility may omit/null every index. Only this
+                    # known endpoint may use the returned input-order array.
+                    gemini = (
+                        urlsplit(self.settings.embedding_base_url).hostname
+                        == "generativelanguage.googleapis.com"
+                    )
+                    if (
+                        gemini
+                        and len(data) == len(texts)
+                        and all(item.index is None for item in data)
+                    ):
+                        for index, item in enumerate(data):
+                            item.index = index
+                    if any(item.index is None for item in data):
+                        raise ValueError("Response omitted input indices")
+                    data.sort(
+                        key=lambda item: item.index if item.index is not None else -1
+                    )
                     if [item.index for item in data] != list(range(len(texts))):
                         raise ValueError("Response indices do not match input")
                     vectors = [item.embedding for item in data]
@@ -153,6 +185,8 @@ class OpenAIEmbeddingProvider:
                         "EMBEDDING_INVALID_RESPONSE",
                         "Invalid embedding shape/dimensions. No vectors committed.",
                     ) from exc
+                if self.settings.embedding_normalize:
+                    vectors = [normalize(v) for v in vectors]
                 return vectors
             raise ChatError("EMBEDDING_HTTP_ERROR", "Embedding retries exhausted.")
         except httpx.TimeoutException as exc:
@@ -167,3 +201,8 @@ class OpenAIEmbeddingProvider:
         finally:
             if owned:
                 client.close()
+
+
+def normalize(vector: list[float]) -> list[float]:
+    norm = math.sqrt(sum(x * x for x in vector))
+    return [x / norm for x in vector]

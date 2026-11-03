@@ -6,15 +6,18 @@ Memora AI is being built as a local-first AI knowledge workspace, bringing
 conversations, document evidence, meeting insights, durable memory, approved
 actions, and editable presentations into one place.
 
-**Current implementation: Phase 1 — streaming chat and persisted sessions.**
+**Current implementation: Phase 2 — PDF ingestion and grounded retrieval.**
 Chat streams through a backend provider adapter, saves conversations and partial
 responses in Postgres, and restores history on reload/restart. LangGraph
 checkpoints persist server-side. Missing credentials produce a configuration
 notice; there are no simulated production answers. Real external API acceptance
-is pending owner-supplied credentials. PDF upload, asynchronous parsing/indexing,
+is pending successful model access. PDF upload, asynchronous parsing/indexing,
 hybrid retrieval and page citations are implemented. Meetings, durable semantic
 memory, email, web search and presentations belong to later phases. Both real
-Phase 1 model and Phase 2 Embedding/RAG acceptance remain pending verification.
+Phase 1 model and Phase 2 full RAG acceptance remain pending verification.
+The Gemini follow-up verified real 768-dimensional embeddings and hybrid retrieval
+on a tiny PDF; the requested chat model returned HTTP 404. See the
+[measured Gemini report](docs/evals/gemini-compatibility.md).
 
 ## Architecture
 
@@ -78,10 +81,11 @@ has comments and empty/obvious placeholders:
 
 ```dotenv
 LLM_PROVIDER=openai_compatible
-LLM_MODEL=your-model-id
+LLM_MODEL=gemini-2.5-flash-lite
 LLM_API_KEY=
-LLM_BASE_URL=https://api.openai.com/v1
-LLM_TOKEN_PARAMETER=max_completion_tokens
+LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+LLM_TOKEN_PARAMETER=max_tokens
+LLM_REASONING_EFFORT=none
 ```
 
 Paste your Key after `LLM_API_KEY=` and replace `LLM_MODEL` with a model ID that
@@ -102,6 +106,12 @@ For hybrid development, stop and restart the local API process after changing
 `.env`. Do not overwrite a populated `.env` by copying the template again. Never
 use `VITE_*` for API credentials. User messages go to your configured model
 provider when you explicitly send or retry. Chat content is rendered as text.
+
+The checked-in template now targets Gemini's official OpenAI-compatible endpoint,
+with `gemini-2.5-flash-lite`, thinking disabled by the actual JSON field
+`reasoning_effort: "none"`, and `gemini-embedding-001` requested at 768 dimensions.
+Set both backend Key variables locally (the same Gemini Key can be used for both).
+See [Gemini setup and measured verification](docs/evals/gemini-compatibility.md).
 
 ## Verify with your real API credentials
 
@@ -273,8 +283,44 @@ Edit the ignored root `.env` (line numbers refer to the current template):
 | `EMBEDDING_API_KEY` | 38 | Separate Embedding Key |
 | `EMBEDDING_BASE_URL` | 40 | Embedding API root, without `/embeddings` |
 | `EMBEDDING_MODEL` | 43 | Exact Embedding model ID |
-| `EMBEDDING_DIMENSIONS` | 44 | Actual returned vector dimension; 0 is disabled |
+| `EMBEDDING_DIMENSIONS` | 44 | Gemini requests 768; actual returned length must match |
 | `EMBEDDING_SEND_DIMENSIONS` | 47 | False if provider does not accept this request field |
+
+Gemini-specific controls in the same root `.env` / `.env.example`:
+
+| Setting | Line | Effect |
+| --- | --- | --- |
+| `LLM_TOKEN_PARAMETER` | 25 | Sends `max_tokens` |
+| `LLM_MAX_CONCURRENT_REQUESTS` | 35 | One active chat call per supported API process |
+| `EMBEDDING_BATCH_SIZE` | 50 | Up to 8 strings in each `input` array |
+| `LLM_REASONING_EFFORT` | 73 | Sends `none`; disables Gemini 2.5 thinking |
+| `PROVIDER_RETRY_MAX_WAIT_SECONDS` | 75 | At most 15 seconds per retry; longer server hints stop |
+| `EMBEDDING_NORMALIZE` | 77 | Client-side L2 normalization; changes index identity |
+| `EMBEDDING_MAX_INPUT_BYTES` | 80 | Conservative chunk/query byte guard, not a wire parameter |
+| `EMBEDDING_MAX_CONCURRENT_REQUESTS` | 82 | Redis slots shared by API and workers |
+| `EMBEDDING_MIN_INTERVAL_SECONDS` | 84 | Four-second spacing for uncached calls |
+| `EMBEDDING_CACHE_TTL_SECONDS` | 86 | Private profile-scoped vectors cached for 24 hours |
+
+RPM/TPM/RPD are project/model limits; batching and serialization do not guarantee
+free quota availability. Inspect your actual AI Studio limits. HTTP 429 is
+classified as daily quota, unavailable quota/billing, token rate, request rate or
+unknown. Daily/zero quota is not retried. `Retry-After` (seconds/date) and Google's
+`RetryInfo.retryDelay` are honored only within the configured wait and retry
+count; unknown 429 without a timing hint stops. No partial stream is replayed.
+No job or index is automatically resubmitted after failure.
+
+The database currently uses exact pgvector cosine search and a GIN full-text
+index, without HNSW/IVFFlat. The `vector` storage limit is 16,000 dimensions;
+ordinary vector ANN indexes support up to 2,000. The 768-dimensional profile fits
+both. Returned vectors must already match 768; the application never silently
+truncates 3,072-dimensional replies. Switching model, dimensions, Base URL or
+normalization requires an explicit rebuild. Existing oversized chunks need
+`scripts/reindex_documents.py --document <uuid> --reparse`, not automatic retries.
+
+Successful batches are cached even if a later batch fails. A retry reuses parsed
+chunks and matching vectors; a profile change cannot reuse the old vectors.
+Cache keys contain hashes, not raw PDF/query text. Document vectors are scoped to
+owner/document and purged on deletion; query vectors expire after the TTL.
 
 Model and dimensions must be configured together. The adapter validates every
 returned vector. Keys remain server-side; no Key is automatically borrowed from
@@ -330,14 +376,19 @@ cleans its isolated project/volumes. Production images exclude all test provider
 Fixtures live under ignored `data/phase2-fixtures/`. This is not a real-provider
 acceptance pass.
 
-**Phase 1 real chat model: pending. Phase 2 real Embedding/RAG: pending.** After
-you configure real keys, upload the generated project brief (or your own known
+**Phase 1 real chat model: pending. Phase 2 full RAG: pending.** Real Gemini
+Embedding dimensions/storage/retrieval passed a tiny synthetic-PDF smoke test;
+the requested `gemini-2.5-flash-lite` returned HTTP 404, so no real grounded answer
+was accepted. After selecting a model accessible to your project, upload the
+generated project brief (or your own known
 PDF), wait for ready, ask its API deadline and check filename/page/excerpt against
 the original. Reload, restart containers, repeat retrieval, then test a model or
 dimension change followed by explicit rebuild. Invalid Key/dimensions and
 corrupt/scanned files must fail without fabricated answers. Actual provider
-access, model support, embedding quality and grounded answer quality have not
-been verified. See [the Phase 2 report](docs/evals/phase-2.md).
+access and grounded answer quality still require verification. The small
+Embedding result does not establish corpus-wide semantic quality. See
+[the Phase 2 report](docs/evals/phase-2.md) and
+[the Gemini follow-up](docs/evals/gemini-compatibility.md).
 
 ## Configuration and privacy
 

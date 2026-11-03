@@ -22,6 +22,7 @@ from app.services.embedding import (
     embedding_configuration,
     profile,
 )
+from app.services.embedding_cache import EmbeddingCache
 from app.services.llm.provider import ChatError
 from app.services.pdf import chunk_pages, extract_pages, lexical_text
 from app.services.storage import PrivateStorage, safe_filename
@@ -44,6 +45,19 @@ class DocumentService:
             settings.redis_url.get_secret_value(),
             socket_connect_timeout=settings.dependency_timeout_seconds,
             socket_timeout=settings.dependency_timeout_seconds,
+        )
+        self.cache = (
+            EmbeddingCache(settings, self.redis, self.embeddings)
+            if embeddings is None
+            else None
+        )
+
+    def embed(self, scope: str, texts: list[str]) -> list[list[float]]:
+        # Independent test-provider injection bypasses production admission/cache.
+        return (
+            self.cache.embed(scope, texts)
+            if self.cache
+            else self.embeddings.embed(texts)
         )
 
     def owned(
@@ -320,6 +334,7 @@ class DocumentService:
                     self.settings.pdf_chunk_tokens,
                     self.settings.pdf_chunk_overlap,
                     self.settings.pdf_max_chunks,
+                    self.settings.embedding_max_input_bytes,
                 )
                 with self.sessions.begin() as db:
                     current_job = db.get(Job, identifier, with_for_update=True)
@@ -380,7 +395,9 @@ class DocumentService:
             vectors = []
             batch = self.settings.embedding_batch_size
             for start in range(0, len(texts), batch):
-                vectors.extend(self.embeddings.embed(texts[start : start + batch]))
+                vectors.extend(
+                    self.embed(f"{owner}:{doc_id}", texts[start : start + batch])
+                )
                 with self.sessions.begin() as db:
                     db.execute(
                         update(Job)
@@ -473,7 +490,7 @@ class DocumentService:
         if not identifiers:
             return []
         self.validate_scope(owner, identifiers)
-        vector = self.embeddings.embed([question])[0]
+        vector = self.embed(f"{owner}:queries", [question])[0]
         distance = DocumentChunk.embedding.cosine_distance(vector)
         terms = [
             word
@@ -561,6 +578,8 @@ class DocumentService:
         with self.sessions.begin() as db:
             row = self.owned(db, owner, identifier, lock=True)
             key = row.storage_key
+            if self.cache:
+                self.cache.drop(f"{owner}:{identifier}")
             # Remove original first; a storage failure must not claim deletion success.
             self.storage.delete(key)
             db.delete(row)

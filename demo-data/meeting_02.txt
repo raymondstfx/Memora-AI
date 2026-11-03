@@ -1,0 +1,8 @@
+Title: Release readiness checkpoint
+Date: 2026-11-04
+Timezone: Asia/Shanghai
+Location: Demo room
+Alex: The API delivery deadline is now 2026-11-08.
+Bailey: QA is still blocked because test data authorization is missing.
+Casey: Decision: the customer demo remains on 2026-11-09 and cannot move.
+Alex: I will confirm the API mitigation plan by 2026-11-05.

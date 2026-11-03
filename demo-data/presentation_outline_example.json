@@ -1,0 +1,74 @@
+{
+  "presentation_title": "项目交付与风险",
+  "theme": "memora",
+  "language": "zh",
+  "slide_count": 6,
+  "slides": [
+    {
+      "type": "cover",
+      "title": "项目概览",
+      "bullets": [
+        "API 客户演示项目：以来源证据连接信息、风险和行动。",
+        "固定演示日期为 2026-11-09，所有事实均来自合成样本。"
+      ],
+      "source_refs": [],
+      "visual_spec": "none",
+      "speaker_notes": "Synthetic example only. Runtime sources must be bound and validated; this is not a production fallback."
+    },
+    {
+      "type": "two_column",
+      "title": "项目负责人与目标",
+      "bullets": [
+        "Alex 负责 API；Bailey 负责 QA；Casey 确认客户演示安排。",
+        "验收要求 API 可用、测试数据获授权，并完成风险复核。"
+      ],
+      "source_refs": [],
+      "visual_spec": "none",
+      "speaker_notes": "Synthetic example only. Runtime sources must be bound and validated; this is not a production fallback."
+    },
+    {
+      "type": "timeline",
+      "title": "项目日期变化",
+      "bullets": [
+        "11 月 2 日会议：API 初始截止日期为 2026-11-05。",
+        "11 月 4 日会议：API 截止日期改为 2026-11-08。"
+      ],
+      "source_refs": [],
+      "visual_spec": "none",
+      "speaker_notes": "Synthetic example only. Runtime sources must be bound and validated; this is not a production fallback."
+    },
+    {
+      "type": "risk_matrix",
+      "title": "项目风险",
+      "bullets": [
+        "API 延期与 QA 数据授权阻塞，使固定客户演示面临风险。",
+        "严重程度是推断，需要人工结合原始会议证据复核。"
+      ],
+      "source_refs": [],
+      "visual_spec": "none",
+      "speaker_notes": "Synthetic example only. Runtime sources must be bound and validated; this is not a production fallback."
+    },
+    {
+      "type": "bullets",
+      "title": "项目行动",
+      "bullets": [
+        "Alex 在 2026-11-05 前确认 API 缓解计划。",
+        "确认 QA 授权进度；邮件先编辑草稿，再明确批准本地测试发送。"
+      ],
+      "source_refs": [],
+      "visual_spec": "none",
+      "speaker_notes": "Synthetic example only. Runtime sources must be bound and validated; this is not a production fallback."
+    },
+    {
+      "type": "summary",
+      "title": "项目验收",
+      "bullets": [
+        "核对两次会议引用、日期变化以及任务状态。",
+        "确认六页均可编辑、预览完整且引用可追溯。"
+      ],
+      "source_refs": [],
+      "visual_spec": "none",
+      "speaker_notes": "Synthetic example only. Runtime sources must be bound and validated; this is not a production fallback."
+    }
+  ]
+}

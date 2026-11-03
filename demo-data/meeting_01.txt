@@ -1,0 +1,8 @@
+Title: Synthetic Phase 3 live recheck
+Date: 2026-11-02
+Timezone: Asia/Shanghai
+Location: Demo room
+Alex: I own the API and will deliver it by 2026-11-05.
+Bailey: QA is blocked because test data permission is missing.
+Casey: Decision: customer demo remains on 2026-11-09.
+Alex: I will confirm the API plan by 2026-11-05.

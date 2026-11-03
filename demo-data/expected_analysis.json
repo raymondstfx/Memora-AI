@@ -1,0 +1,31 @@
+{
+  "synthetic": true,
+  "timezone": "Asia/Shanghai",
+  "api_owner": "Alex",
+  "qa_owner": "Bailey",
+  "meeting_dates": [
+    "2026-11-02",
+    "2026-11-04"
+  ],
+  "api_deadline_history": [
+    "2026-11-05",
+    "2026-11-08"
+  ],
+  "demo_date": "2026-11-09",
+  "risk": "API delay and blocked QA threaten the fixed customer demo",
+  "evidence": {
+    "owner": {
+      "file": "meeting_01.txt",
+      "line": 5
+    },
+    "initial_deadline": {
+      "file": "meeting_01.txt",
+      "line": 5
+    },
+    "changed_deadline": {
+      "file": "meeting_02.txt",
+      "line": 5
+    }
+  },
+  "emails_require_approval": true
+}

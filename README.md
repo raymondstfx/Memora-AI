@@ -6,7 +6,20 @@ Memora AI is being built as a local-first AI knowledge workspace, bringing
 conversations, document evidence, meeting insights, durable memory, approved
 actions, and editable presentations into one place.
 
-**Current implementation: Phase 5 — sourced research and editable presentations.**
+**Current source: Phase 6 — local hardening and acceptance review.**
+
+Phase 6 is now loaded in the **local running services** after the owner's
+2026-11-04 acceptance update. Configuration, data and indexes were preserved;
+no commit/push or remote deployment was performed.
+
+Latest real results: Tavily search and six-slide file generation passed. Gemini
+meeting HTTP 503 did not recur (HTTP 200), but structured/evidence validation
+still failed. The generated deck also needs date/role content corrections; the
+two-real-meeting temporal gate remains pending. See the
+[final acceptance report and direct demo steps](docs/evals/final-acceptance.md).
+Earlier independent-Provider A01–A22 results are in
+[Phase 6](docs/evals/phase-6.md); the [runbook](docs/runbook.md) preserves setup and
+recovery instructions.
 Chat streams through a backend provider adapter, saves conversations and partial
 responses in Postgres, and restores history on reload/restart. LangGraph
 checkpoints persist server-side. Missing credentials produce a configuration
@@ -176,8 +189,32 @@ search loop or external email is part of generation.
 See [Phase 5 API](docs/api/phase-5.md) and
 [Phase 5 verification](docs/evals/phase-5.md) for actual results and pending gates.
 Previous full Phase 1/2 real API gates and two-real-meeting Phase 4 acceptance
-remain pending. The new search Key is not configured; live search and real-model
-presentation quality are not claimed verified. No Phase 6 work is included.
+remain pending. The local search Key is configured and real search passed in the final follow-up;
+real slide files passed while semantic quality issues remain documented. Phase 6 local hardening is recorded below.
+
+## Phase 6: demonstration and hardening
+
+[demo-data](demo-data/README.md) contains a one-page PDF, two dated meeting TXTs,
+expected facts/evidence and a six-slide outline illustration. All are synthetic;
+none is a runtime AI fallback. The first TXT preserves an existing real-extracted
+sample so duplicate upload can reuse it. The second changes the API deadline from
+Nov 5 to Nov 8 while the customer demo remains fixed on Nov 9.
+
+This phase improves mobile forms, checkbox alignment, long evidence wrapping,
+preview loading/error/retry and current capability labels. It also fixes stale
+presentation executions/callbacks overwriting newer retries, adds atomic leased
+publication, safer search URLs/Base URLs, private API caching/security headers,
+and allowlisted job-stage logs. ISO dates stay intact in editable slide layouts.
+No schema migration, index rebuild or normal database cleanup was performed.
+
+The [runbook](docs/runbook.md) gives the full upload → extraction → memory →
+reviewed local email → search → six-slide demonstration, startup and recovery.
+The [phase report](docs/evals/phase-6.md) distinguishes independent test results,
+actual live failures, historical smoke evidence and missing-Key blockers.
+Curated [screenshots](docs/screenshots/phase-6/README.md) show synthetic independent-
+Provider output, including all six Chinese pages; they are not live Tavily/Gemini
+acceptance evidence. External email remains disabled. The owner approved the local refresh on 2026-11-04; remote/public deployment
+remains unauthorized.
 
 ## Architecture
 

@@ -5,9 +5,10 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 from urllib.error import HTTPError
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 ENV = {
@@ -54,6 +55,48 @@ def main() -> None:
         )
         health(58000)
         health(55173)  # Real Nginx -> API -> dependency path.
+        pdf_id = None
+        if ENV.get("MEMORA_PDF_TEST") == "1":
+            import httpx
+
+            with httpx.Client(
+                trust_env=False, base_url="http://127.0.0.1:58000", timeout=30
+            ) as client:
+                with Path(ENV["TEST_PDF_PATH"]).open("rb") as original:
+                    uploaded = client.post(
+                        "/api/documents/upload",
+                        files={
+                            "file": ("project_brief.pdf", original, "application/pdf")
+                        },
+                    )
+                assert uploaded.status_code == 202, (
+                    f"HTTP {uploaded.status_code}: {uploaded.text}"
+                )
+                pdf_id = uploaded.json()["document_id"]
+                for _ in range(120):
+                    state = client.get(f"/api/jobs/{uploaded.json()['job_id']}").json()
+                    if state["status"] in ("succeeded", "failed"):
+                        break
+                    time.sleep(0.5)
+                assert state["status"] == "succeeded", state
+        chat_id = None
+        if ENV.get("MEMORA_CHAT_TEST") == "1":
+            body = json.dumps({"message": "restart persistence probe"}).encode()
+            with urlopen(
+                Request(
+                    "http://127.0.0.1:58000/api/chat/stream",
+                    data=body,
+                    headers={"Content-Type": "application/json"},
+                ),
+                timeout=30,
+            ) as result:
+                frames = [
+                    json.loads(line[6:])
+                    for line in result.read().decode().splitlines()
+                    if line.startswith("data: ")
+                ]
+            assert frames[-1]["event"] == "message_end"
+            chat_id = frames[0]["conversation_id"]
         compose(
             "exec", "-T", "redis", "redis-cli", "SET", "phase0:persistence", "verified"
         )
@@ -71,9 +114,42 @@ def main() -> None:
             "VALUES ('restart_probe', 'verified') "
             "ON CONFLICT (key) DO UPDATE SET value = 'verified'",
         )
-        compose("restart", "postgres", "redis")
+        compose(
+            "restart",
+            "postgres",
+            "redis",
+            *(["api"] if chat_id else []),
+            *(["worker"] if pdf_id else []),
+        )
         compose("up", "-d", "--wait", "postgres", "redis")
+        if chat_id:
+            compose("up", "-d", "--wait", "api", *(["worker"] if pdf_id else []))
         health(58000)
+        if pdf_id:
+            with httpx.Client(
+                trust_env=False, base_url="http://127.0.0.1:58000", timeout=30
+            ) as client:
+                assert (
+                    client.get(f"/api/documents/{pdf_id}").json()["status"] == "ready"
+                )
+                assert (
+                    client.get(f"/api/documents/{pdf_id}/file").content
+                    == Path(ENV["TEST_PDF_PATH"]).read_bytes()
+                )
+                sources = client.post(
+                    "/api/documents/search",
+                    json={"question": "API deadline", "document_ids": [pdf_id]},
+                ).json()["sources"]
+                assert sources and sources[0]["page_no"] == 1
+        if chat_id:
+            compose("up", "-d", "--wait", "api")
+            with urlopen(
+                f"http://127.0.0.1:58000/api/conversations/{chat_id}/messages",
+                timeout=10,
+            ) as result:
+                rows = json.loads(result.read())
+            assert rows[-1]["status"] == "complete"
+            assert "restart persistence probe" in rows[-1]["content"]
         result = subprocess.check_output(
             [*COMPOSE, "exec", "-T", "redis", "redis-cli", "GET", "phase0:persistence"],
             cwd=ROOT,

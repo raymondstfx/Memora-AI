@@ -11,8 +11,13 @@ type Search = components["schemas"]["WebSearchResult"];
 function Preview({ id, count }: { id: string; count: number }) {
   const ref = useRef<HTMLDivElement>(null);
   const [error, setError] = useState("");
+  const [rendered, setRendered] = useState(0);
+  const [version, setVersion] = useState(0);
   useEffect(() => {
     let cancelled = false;
+    setError("");
+    setRendered(0);
+    ref.current?.replaceChildren();
     const task = getDocument({ url: `/api/presentations/${id}/download.pdf` });
     const render = async () => {
       const pdf = await task.promise;
@@ -33,6 +38,7 @@ function Preview({ id, count }: { id: string; count: number }) {
         canvas.setAttribute("aria-label", `Slide ${page} of ${count}`);
         container.append(canvas);
         await doc.render({ canvas, viewport }).promise;
+        if (!cancelled) setRendered(page);
       }
     };
     void render().catch((cause) => {
@@ -43,10 +49,22 @@ function Preview({ id, count }: { id: string; count: number }) {
       cancelled = true;
       void task.destroy();
     };
-  }, [id, count]);
+  }, [id, count, version]);
   return (
     <section aria-label="Presentation preview">
-      {error && <p role="alert">{error}</p>}
+      {!error && rendered < count && (
+        <p role="status">
+          Rendering preview {rendered}/{count} pages…
+        </p>
+      )}
+      {error && (
+        <>
+          <p role="alert">Preview failed: {error}</p>
+          <Button onClick={() => setVersion((value) => value + 1)}>
+            Retry preview
+          </Button>
+        </>
+      )}
       <div ref={ref} />
     </section>
   );
@@ -75,9 +93,12 @@ export function PresentationPanel() {
     [busy, setBusy] = useState(false),
     [activity, setActivity] = useState("");
   const requestKey = useRef<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [reload, setReload] = useState(0);
   const refresh = async () => setDecks(await api<Deck[]>("/presentations"));
   useEffect(() => {
     let alive = true;
+    setLoading(true);
     void Promise.all([
       api<Deck[]>("/presentations"),
       api<components["schemas"]["DocumentOut"][]>("/documents"),
@@ -90,15 +111,19 @@ export function PresentationPanel() {
           setDocuments(docs);
           setMeetings(items);
           setConfig(search.message);
+          setError("");
         }
       })
       .catch((cause) => {
         if (alive) setError(String(cause));
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
       });
     return () => {
       alive = false;
     };
-  }, []);
+  }, [reload]);
   const pending = decks.some(
     (d) => d.status === "queued" || d.status === "running",
   );
@@ -123,6 +148,10 @@ export function PresentationPanel() {
   return (
     <section className="phase3-panel" aria-label="Presentations workspace">
       <h2>Search and create an editable presentation</h2>
+      {loading && <p role="status">Loading presentation workspace…</p>}
+      {!loading && !decks.length && (
+        <p>No presentations yet. Select evidence and create your first deck.</p>
+      )}
       <p>
         Selected private evidence is sent to your configured model. Web research
         is optional. No email is sent.
@@ -316,12 +345,7 @@ export function PresentationPanel() {
         </Button>
       </form>
       {error && <p role="alert">{error}</p>}
-      <Button
-        variant="outline"
-        onClick={() => {
-          void refresh().catch((cause) => setError(String(cause)));
-        }}
-      >
+      <Button variant="outline" onClick={() => setReload((value) => value + 1)}>
         Refresh presentations
       </Button>
       <nav aria-label="Saved presentations">

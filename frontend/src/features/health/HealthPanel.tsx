@@ -108,7 +108,7 @@ export function HealthPanel() {
         )}
       </div>
       <div className="panel-footer">
-        <span>Phase 0 · Infrastructure only</span>
+        <span>Local dependencies · live status</span>
         <a href="/docs" target="_blank" rel="noreferrer">
           API reference <ArrowUpRight size={14} />
         </a>

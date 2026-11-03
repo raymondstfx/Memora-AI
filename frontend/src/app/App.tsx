@@ -58,7 +58,7 @@ const pages = [
     phase: 4,
     text: "Keep the context that matters.",
     detail:
-      "Durable facts, provenance and a history of changes arrive in Phase 5.",
+      "Review durable facts, original evidence and their history of changes.",
   },
   {
     title: "Tasks & Actions",
@@ -73,8 +73,7 @@ const pages = [
     icon: FileSliders,
     phase: 5,
     text: "Bring your thinking into focus.",
-    detail:
-      "Editable PowerPoint generation, previews and downloads arrive in Phase 5.",
+    detail: "Generate editable PowerPoint files with complete PDF previews.",
   },
   {
     title: "Settings",
@@ -139,12 +138,15 @@ export function App() {
             <span className="build-label">
               <span className="status-dot" /> FOUNDATION
             </span>
-            <strong>A thoughtful start.</strong>
-            <p>Chat and saved sessions. Configure your model to get started.</p>
+            <strong>Evidence into action.</strong>
+            <p>
+              Documents, meetings, memory and reviewed actions in one local
+              workspace.
+            </p>
             <div className="progress-track">
               <span />
             </div>
-            <small>Phase 5 of 6</small>
+            <small>Phase 6 of 6</small>
           </div>
           <a
             className="help-link"
@@ -181,7 +183,7 @@ export function App() {
             <strong>{active}</strong>
           </div>
           <span className="phase-badge">
-            <span className="status-dot" /> Phase 5 · Research & presentations
+            <span className="status-dot" /> Phase 6 · Connected workspace
           </span>
         </header>
         <main id="main">

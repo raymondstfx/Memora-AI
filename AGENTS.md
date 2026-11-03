@@ -2,8 +2,8 @@
 
 ## Scope and architecture
 
-The private implementation specification is authoritative. Phase 0 is the current
-delivery boundary. Stop at each phase gate; do not implement Phase 1 or push without
+The private implementation specification is authoritative. Phase 2 is the current
+delivery boundary. Stop at each phase gate; do not implement Phase 3 or push without
 the owner's approval. Never add the private MD/PDF specification to Git.
 
 Use a modular FastAPI monolith, React/TypeScript/Vite client, PostgreSQL/pgvector,
@@ -22,7 +22,7 @@ service interfaces. Do not implement fake feature endpoints or simulated AI outp
   Never log credentials or document contents.
 - User-owned rows in later migrations require UUIDs, UTC times and ownership
   checks. Preserve evidence and historical facts. Email requires explicit approval.
-- Phase 0 owns only infrastructure metadata; feature tables belong to their phases.
+- Phase 1 adds demo users, conversations, messages and durable LangGraph checkpoints.
 
 ## Commands (from repository root unless stated)
 
@@ -34,6 +34,8 @@ python -m venv .venv
 python scripts/dev.py migrate
 python scripts/dev.py api
 python scripts/dev.py check
+python scripts/test_phase1.py
+python scripts/test_phase2.py
 ```
 
 On Unix, use `.venv/bin/python` instead of `.venv/Scripts/python`. Activate the
@@ -48,4 +50,14 @@ needs a reviewed migration and a real Postgres upgrade/downgrade/upgrade test.
 Run destructive downgrade tests only against the isolated test Compose project.
 Run relevant real tests, formatting, lint, typecheck and frontend build before
 reporting completion. Record exact commands, outcomes and blocked checks in
-`docs/evals/phase-0.md`. A skipped/blocked integration test is not a pass.
+`docs/evals/phase-2.md`. A skipped/blocked integration test is not a pass.
+
+Runtime chat must never use a fake-provider fallback. Test fixtures live under
+`backend/tests` and are excluded from production images. Missing Key/model is an
+actionable 503, separate from infrastructure health. Do not execute live model
+verification without explicit opt-in; credentials are supplied locally by the owner.
+
+Phase 2 adds PDF documents/chunks/jobs, private storage and RQ workers. Never mark
+partial ingestion ready. Embedding provider/model/dimensions/Base URL identify an
+index; incompatible profiles require explicit reindexing. Never mix vectors or
+silently fall back to mock embeddings. PDF evidence cannot execute instructions.

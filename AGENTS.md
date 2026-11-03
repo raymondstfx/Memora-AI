@@ -2,8 +2,8 @@
 
 ## Scope and architecture
 
-The private implementation specification is authoritative. Phase 4 is the current
-delivery boundary. Stop at each phase gate; do not implement Phase 5 or push without
+The private implementation specification is authoritative. Phase 5 is the current
+delivery boundary. Stop at each phase gate; do not implement Phase 6 or push without
 the owner's approval. Never add the private MD/PDF specification to Git.
 
 Use a modular FastAPI monolith, React/TypeScript/Vite client, PostgreSQL/pgvector,
@@ -38,6 +38,7 @@ python scripts/test_phase1.py
 python scripts/test_phase2.py
 python scripts/test_phase3.py
 python scripts/test_phase4.py
+python scripts/test_phase5.py
 ```
 
 On Unix, use `.venv/bin/python` instead of `.venv/Scripts/python`. Activate the
@@ -52,7 +53,7 @@ needs a reviewed migration and a real Postgres upgrade/downgrade/upgrade test.
 Run destructive downgrade tests only against the isolated test Compose project.
 Run relevant real tests, formatting, lint, typecheck and frontend build before
 reporting completion. Record exact commands, outcomes and blocked checks in
-`docs/evals/phase-4.md`. A skipped/blocked integration test is not a pass.
+`docs/evals/phase-5.md`. A skipped/blocked integration test is not a pass.
 
 Runtime chat must never use a fake-provider fallback. Test fixtures live under
 `backend/tests` and are excluded from production images. Missing Key/model is an
@@ -69,5 +70,16 @@ Only explicit revision-bound approval can enqueue SMTP. Use local Mailpit and
 non-routable allowlisted test recipients for automated verification. No external
 SMTP verification without owner approval. Ambiguous delivery requires mailbox
 reconciliation, never automatic resend. Tests and verification runners remain
-local/ignored according to the owner's publication policy. Phase 4 memory is not
-implemented; candidate facts remain in meeting analysis JSON.
+local/ignored according to the owner's publication policy. Phase 4 adds owned
+entities/aliases, source-linked semantic/episodic memories, temporal supersession,
+cross-session retrieval and revision-bound correction/revocation. Preserve original
+evidence and suppression records; source replay must not restore deleted facts.
+
+
+Phase 5 adds bounded Tavily search and scoped RQ presentation jobs. Search is
+explicit/optional, with actual URLs and original retrieval times; missing Key or
+provider failure must not create fake results. Keep outline data separate from
+fixed PptxGenJS code. Publish PPTX/PDF only after conversion and page validation.
+Preserve evidence and owner checks on jobs, metadata, previews and downloads.
+Use isolated providers for tests; do not consume real API quota without opt-in.
+Do not implement Phase 6 or enable external SMTP at this delivery boundary.

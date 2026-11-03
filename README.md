@@ -6,15 +6,15 @@ Memora AI is being built as a local-first AI knowledge workspace, bringing
 conversations, document evidence, meeting insights, durable memory, approved
 actions, and editable presentations into one place.
 
-**Current implementation: Phase 4 — durable memory with dated evidence.**
+**Current implementation: Phase 5 — sourced research and editable presentations.**
 Chat streams through a backend provider adapter, saves conversations and partial
 responses in Postgres, and restores history on reload/restart. LangGraph
 checkpoints persist server-side. Missing credentials produce a configuration
 notice; there are no simulated production answers. Real external API acceptance
 has passed a bounded Gemini streaming/RAG smoke test. PDF upload, asynchronous parsing/indexing,
 hybrid retrieval and page citations are implemented. Meetings, tasks and approved
-mail transport and durable semantic/episodic memory are implemented. Web search
-and presentations belong to later phases. Both real
+mail transport and durable semantic/episodic memory are implemented. Web search and editable PPTX generation with PDF preview are implemented.
+Production hardening remains outside this delivery. Both real
 Phase 1 model and Phase 2 full RAG acceptance remain pending verification.
 The Gemini follow-up verified real 768-dimensional embeddings and hybrid retrieval
 on a tiny PDF. The subsequent 404 fix selected `gemini-3.1-flash-lite` from the
@@ -119,7 +119,65 @@ ordinary chat and assistant guesses are not promoted to durable facts.
 No new provider configuration is required. Existing Gemini/Embedding settings,
 caches, concurrency and finite retries are retained. Root `.env` stays ignored.
 See [Phase 4 acceptance](docs/evals/phase-4.md) and
-[the memory API contract](docs/api/phase-4.md). Phase 5 is not implemented.
+[the memory API contract](docs/api/phase-4.md). Phase 5 is described below; Phase 6 is not implemented.
+
+## Phase 5: web research and editable presentations
+
+Open **Presentations** to search external sources, select ready PDFs and meetings,
+include owned memories, and generate an exact number of slides. The model receives
+selected evidence and returns a strict structured outline; fixed PptxGenJS code
+renders editable text and shapes. LibreOffice converts the deck to PDF, with an
+exact page-count check before either file is published. PDF.js previews every
+page. Short source notes appear on slides; full source references/URLs/retrieval
+times are preserved in notes and the saved outline. Download both PPTX and PDF.
+
+Explicitly enable optional web research using the query field, or use
+`/search keywords` in Chat. Search uses Tavily basic results, with actual links
+and retrieval times; cached results retain their original retrieval timestamp.
+Missing Key, quota/provider failures and empty evidence never produce invented
+live results. Retrieved content is evidence, never executable instructions.
+
+Root `.env` / `.env.example` positions match. Existing Gemini and Embedding
+settings are unchanged; no vector index is rebuilt.
+
+| Backend setting | Line | Purpose |
+| --- | --- | --- |
+| SEARCH_API_KEY | 66 | Fill your Tavily Key in ignored `.env` only; currently blank |
+| SEARCH_BASE_URL | 110 | Official https://api.tavily.com |
+| SEARCH_MAX_RESULTS / SEARCH_TIMEOUT_SECONDS | 111 / 112 | At most 5 results; 15 seconds |
+| SEARCH_CACHE_TTL_SECONDS | 114 | 300-second per-owner private search cache |
+| PRESENTATION_MAX_OUTPUT_TOKENS | 116 | 6000; applied to structured outline requests |
+| PRESENTATION_JOB_TIMEOUT_SECONDS | 117 | 240-second RQ job bound |
+| PRESENTATION_CONVERSION_TIMEOUT_SECONDS | 118 | 90-second LibreOffice conversion bound |
+| PRESENTATION_NODE / PRESENTATION_LIBREOFFICE | 120 / 121 | Local executable names or paths |
+
+After editing `.env`, recreate the API/worker with:
+
+```powershell
+docker compose --profile app --profile mail up --build -d --wait
+```
+
+The runtime installs LibreOffice Impress and WenQuanYi Zen Hei CJK fonts and
+copies Node plus locked renderer dependencies from a separate build stage. Apt
+package signatures remain checked. An optional build-only APT_MIRROR override is
+available for trusted Debian mirrors; default is the standard Debian source.
+For hybrid local development, run `npm ci` inside `backend/renderer`, install
+LibreOffice and the configured CJK font, and set executable paths if necessary.
+The container path is the verified target; existing hybrid/Windows limitations
+remain in the phase report.
+
+Progress exposes retrieval/planning/rendering/conversion stages. One active job
+per owner is allowed. Repeated request keys reuse the same presentation. Failed
+jobs require explicit retry (at most three attempts); a persisted valid outline
+is reused for conversion retries. Files stay private and ownership is checked on
+metadata, jobs, previews and downloads. No automatic index rebuild, repeated
+search loop or external email is part of generation.
+
+See [Phase 5 API](docs/api/phase-5.md) and
+[Phase 5 verification](docs/evals/phase-5.md) for actual results and pending gates.
+Previous full Phase 1/2 real API gates and two-real-meeting Phase 4 acceptance
+remain pending. The new search Key is not configured; live search and real-model
+presentation quality are not claimed verified. No Phase 6 work is included.
 
 ## Architecture
 

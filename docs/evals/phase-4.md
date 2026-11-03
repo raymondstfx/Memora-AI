@@ -158,3 +158,19 @@ for local sending. No email was sent during the live extraction or memory import
   Windows RQ/hybrid bind-mount end-to-end acceptance remains unverified.
 
 Stop after Phase 4; do not enter Phase 5 or push without owner approval.
+
+
+## Repeat-request status check — 2026-11-03
+
+The repeated Phase 4 request was checked against the implemented code, private
+specification and existing acceptance records. No live model request was repeated.
+Read-only/local API checks confirmed the saved real meeting remains ready with
+three people, one risk, three task proposals, the correct Alex/Nov 5 task date,
+unapproved empty-recipient drafts, and owner recall linked to the same meeting.
+SMTP remains local and external sending false. The previous isolated acceptance
+log still records 45 integration and 15 browser tests passing; these are previous
+run results, not a newly executed full suite. This check used zero Gemini,
+Embedding or SMTP requests. Fixed the stale AGENTS.md sentence saying Phase 4
+was unimplemented. Three existing implementation commits remain local; the
+subsequently authorized push failed on GitHub connection timeout. Phase 5 is
+not started; no new push was attempted by this repeated implementation request.

@@ -42,6 +42,31 @@ class SearchService:
                 "Set SEARCH_API_KEY in backend root .env (Tavily).",
                 503,
             )
+        try:
+            endpoint = urlsplit(s.search_base_url)
+            local = endpoint.hostname in (
+                "127.0.0.1",
+                "localhost",
+                "::1",
+                "host.docker.internal",
+            )
+            if (
+                not endpoint.hostname
+                or endpoint.username is not None
+                or endpoint.password is not None
+                or endpoint.query
+                or endpoint.fragment
+                or not (
+                    endpoint.scheme == "https" or (local and endpoint.scheme == "http")
+                )
+            ):
+                raise ValueError("Invalid endpoint")
+        except ValueError as exc:
+            raise ChatError(
+                "SEARCH_BASE_URL_INVALID",
+                "Set a trusted HTTPS SEARCH_BASE_URL at .env line 110.",
+                503,
+            ) from exc
         digest = hashlib.sha256(
             (
                 str(owner) + s.search_base_url + query + str(s.search_max_results)
@@ -119,7 +144,9 @@ class SearchService:
                     if (
                         parsed.scheme not in ("https", "http")
                         or not parsed.hostname
-                        or parsed.username
+                        or parsed.username is not None
+                        or parsed.password is not None
+                        or any(ord(c) < 32 for c in url)
                         or len(url) > 2000
                     ):
                         continue

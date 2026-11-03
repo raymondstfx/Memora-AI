@@ -21,7 +21,11 @@ def failed_presentation(job, connection, exception_type, value, traceback):  # t
     engine = build_engine(settings)
     service = PresentationService(engine, settings)
     try:
-        service.fail(UUID(job.args[0]), "PRESENTATION_JOB_INTERRUPTED")
+        attempt = job.meta.get("presentation_attempt")
+        if attempt is not None:
+            service.fail(
+                UUID(job.args[0]), "PRESENTATION_JOB_INTERRUPTED", int(attempt)
+            )
     finally:
         service.redis.close()
         engine.dispose()

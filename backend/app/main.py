@@ -136,6 +136,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 request, 500, "INTERNAL_ERROR", "An internal error occurred."
             )
         response.headers["X-Request-ID"] = request.state.request_id
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        if request.url.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "private, no-store"
         logging.getLogger("memora").info(
             "http_request",
             extra={

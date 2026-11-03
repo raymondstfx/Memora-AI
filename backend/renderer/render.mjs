@@ -16,10 +16,17 @@ for (const [i, item] of outline.slides.entries()) {
   // Explicit wrapping by estimated display width keeps CJK/Latin within fixed boxes.
   const wrap=(value,limit)=>{
     let lines=[""],width=0;
-    for (const ch of value) {
-      const units=ch.codePointAt(0)>255?2:1;
-      if(ch==="\n" || width+units>limit){lines.push("");width=0;if(ch==="\n")continue;}
-      lines[lines.length-1]+=ch;width+=units;
+    // Keep ISO dates and ordinary words intact; CJK remains character-wrapped.
+    const tokens=value.match(/\d{4}-\d{2}-\d{2}|[A-Za-z0-9][A-Za-z0-9_.:/-]*|[\s\S]/gu)||[];
+    for (const token of tokens) {
+      if(token==="\n"){lines.push("");width=0;continue;}
+      const units=[...token].reduce((sum,ch)=>sum+(ch.codePointAt(0)>255?2:1),0);
+      const pieces=units>limit?[...token]:[token];
+      for(const piece of pieces){
+        const size=[...piece].reduce((sum,ch)=>sum+(ch.codePointAt(0)>255?2:1),0);
+        if(width+size>limit){lines.push("");width=0;}
+        lines[lines.length-1]+=piece;width+=size;
+      }
     }return lines.join("\n");
   };
   text(wrap(item.title,64),{x:0.7,y:0.55,w:12,h:1.1,fontSize:22,bold:true});

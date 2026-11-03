@@ -1,6 +1,7 @@
 import asyncio
 import hashlib
 import json
+import logging
 import subprocess
 import tempfile
 from datetime import UTC, datetime, timedelta
@@ -10,7 +11,7 @@ from uuid import UUID
 import httpx
 import pymupdf
 from pydantic import ValidationError
-from rq import Queue
+from rq import Queue, get_current_job
 from rq.job import Callback
 from rq.serializers import JSONSerializer
 from sqlalchemy import Engine, select
@@ -252,16 +253,46 @@ class PresentationService:
             ) from exc
         return self.get(owner, identifier)
 
-    def stage(self, identifier: UUID, stage: str, progress: int) -> None:
-        with self.sessions.begin() as db:
-            row = db.get(Presentation, identifier)
-            assert row
-            row.stage, row.progress = stage, progress
+    def running(self, db: Session, identifier: UUID, attempt: int) -> Presentation:
+        row = db.scalar(
+            select(Presentation).where(Presentation.id == identifier).with_for_update()
+        )
+        if not row or row.status != "running" or row.attempts != attempt:
+            raise ChatError(
+                "PRESENTATION_LEASE_LOST", "This execution no longer owns the job.", 409
+            )
+        return row
 
-    def fail(self, identifier: UUID, code: str) -> None:
+    def stage(self, identifier: UUID, stage: str, progress: int, attempt: int) -> None:
         with self.sessions.begin() as db:
-            row = db.get(Presentation, identifier)
-            if row and row.status not in ("ready", "failed"):
+            row = self.running(db, identifier, attempt)
+            row.stage, row.progress = stage, progress
+        logging.getLogger("memora").info(
+            "presentation_stage",
+            extra={"job_id": str(identifier), "stage": stage, "attempt": attempt},
+        )
+
+    def fail(self, identifier: UUID, code: str, attempt: int | None = None) -> None:
+        with self.sessions.begin() as db:
+            owner = db.scalar(
+                select(Presentation.user_id).where(Presentation.id == identifier)
+            )
+            if owner is None:
+                return
+            db.scalar(select(User).where(User.id == owner).with_for_update())
+            row = db.scalar(
+                select(Presentation)
+                .where(Presentation.id == identifier)
+                .with_for_update()
+            )
+            if (
+                row
+                and row.status not in ("ready", "failed")
+                and (
+                    attempt is None
+                    or (row.status == "running" and row.attempts == attempt)
+                )
+            ):
                 row.status, row.stage, row.error_code = "failed", "failed", code
                 audit(
                     db,
@@ -458,25 +489,29 @@ class PresentationService:
                 return
             row.status, row.stage, row.progress = "running", "retrieving", 5
             row.attempts += 1
+            attempt = row.attempts
             owner = row.user_id
             body = DeckRequest.model_validate(row.request_json)
             saved_outline, saved_sources = row.outline_json, row.sources_json
         try:
+            current = get_current_job()
+            if current:
+                current.meta["presentation_attempt"] = attempt
+                current.save_meta()  # type: ignore[no-untyped-call]
             if saved_outline:
                 outline = Outline.model_validate(saved_outline)
                 sources = saved_sources
             else:
                 sources = self.collect(owner, body)
-                self.stage(identifier, "planning", 25)
+                self.stage(identifier, "planning", 25, attempt)
                 outline = asyncio.run(self.plan(body, sources))
                 with self.sessions.begin() as db:
-                    row = db.get(Presentation, identifier)
-                    assert row
+                    row = self.running(db, identifier, attempt)
                     row.outline_json, row.sources_json = (
                         outline.model_dump(mode="json"),
                         sources,
                     )
-            self.stage(identifier, "rendering", 55)
+            self.stage(identifier, "rendering", 55, attempt)
             with tempfile.TemporaryDirectory(prefix="memora-slides-") as directory:
                 root = Path(directory)
                 payload = root / "outline.json"
@@ -505,7 +540,7 @@ class PresentationService:
                     check=True,
                     capture_output=True,
                 )
-                self.stage(identifier, "converting", 75)
+                self.stage(identifier, "converting", 75, attempt)
                 subprocess.run(
                     [
                         self.settings.presentation_libreoffice,
@@ -536,21 +571,27 @@ class PresentationService:
                         "Conversion failed or preview count differs.",
                         502,
                     )
+                artifacts = {}
                 for extension, path in [("pptx", pptx), ("pdf", pdf)]:
                     if path.stat().st_size > 20_000_000:
                         raise ChatError(
-                            "PRESENTATION_TOO_LARGE",
-                            "Generated output exceeds limit.",
-                            502,
+                            "PRESENTATION_TOO_LARGE", "Output exceeds size limit.", 502
                         )
+                    artifacts[extension] = path.read_bytes()
+            # Row lease stays locked while both private artifacts are atomically
+            # replaced. A stale execution can neither publish nor overwrite a retry.
+            with self.sessions.begin() as db:
+                db.scalar(select(User).where(User.id == owner).with_for_update())
+                row = self.running(db, identifier, attempt)
+                for extension, data in artifacts.items():
                     target = self.storage.path(
                         f"{owner}/presentations/{identifier}/deck.{extension}"
                     )
-                    target.parent.mkdir(parents=True, exist_ok=True)
-                    target.write_bytes(path.read_bytes())
-            with self.sessions.begin() as db:
-                row = db.get(Presentation, identifier)
-                assert row
+                    target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+                    temporary = target.with_name(f"attempt-{attempt}.{extension}.tmp")
+                    temporary.write_bytes(data)
+                    temporary.chmod(0o600)
+                    temporary.replace(target)
                 row.status, row.stage, row.progress, row.page_count = (
                     "ready",
                     "complete",
@@ -566,17 +607,18 @@ class PresentationService:
                     page_count=body.slide_count,
                 )
         except ChatError as exc:
-            self.fail(identifier, exc.code)
+            self.fail(identifier, exc.code, attempt)
         except (ValidationError, ValueError):
-            self.fail(identifier, "OUTLINE_INVALID")
+            self.fail(identifier, "OUTLINE_INVALID", attempt)
         except subprocess.TimeoutExpired:
-            self.fail(identifier, "PRESENTATION_PROCESS_TIMEOUT")
+            self.fail(identifier, "PRESENTATION_PROCESS_TIMEOUT", attempt)
         except FileNotFoundError as exc:
             self.fail(
                 identifier,
                 "PRESENTATION_NODE_MISSING"
                 if exc.filename == self.settings.presentation_node
                 else "PRESENTATION_LIBREOFFICE_MISSING",
+                attempt,
             )
         except subprocess.CalledProcessError as exc:
             self.fail(
@@ -584,9 +626,10 @@ class PresentationService:
                 "PRESENTATION_RENDER_FAILED"
                 if exc.cmd[0] == self.settings.presentation_node
                 else "PREVIEW_CONVERSION_FAILED",
+                attempt,
             )
         except Exception:
-            self.fail(identifier, "PRESENTATION_FAILED")
+            self.fail(identifier, "PRESENTATION_FAILED", attempt)
 
     def file(self, owner: UUID, identifier: UUID, extension: str) -> Path:
         with self.sessions() as db:

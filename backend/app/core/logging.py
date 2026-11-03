@@ -9,7 +9,18 @@ class JsonFormatter(logging.Formatter):
             {
                 "timestamp": datetime.now(UTC).isoformat(),
                 "level": record.levelname,
-                "event": record.getMessage(),
+                "event": record.getMessage()
+                if record.getMessage()
+                in {
+                    "http_request",
+                    "chat_run_finished",
+                    "presentation_stage",
+                    "presentation_failed",
+                }
+                else "redacted_event",
+                "job_id": getattr(record, "job_id", None),
+                "stage": getattr(record, "stage", None),
+                "attempt": getattr(record, "attempt", None),
                 "request_id": getattr(record, "request_id", None),
                 "status_code": getattr(record, "status_code", None),
                 "duration_ms": getattr(record, "duration_ms", None),

@@ -1015,3 +1015,72 @@ h1 {
     display: none;
   }
 }
+
+.phase3-panel {
+  max-width: 1050px;
+  display: grid;
+  gap: 1rem;
+}
+.phase3-panel label {
+  display: grid;
+  gap: 0.4rem;
+  font-weight: 500;
+}
+.phase3-panel input,
+.phase3-panel select,
+.phase3-panel textarea {
+  width: 100%;
+  max-width: 100%;
+  border: 1px solid #cbd5d5;
+  border-radius: 8px;
+  padding: 0.7rem;
+  background: white;
+  color: #182d30;
+}
+.phase3-panel input[type="checkbox"] {
+  width: auto;
+}
+.phase3-panel .approval-check {
+  display: flex;
+  gap: 0.7rem;
+  align-items: center;
+  margin: 1rem 0;
+}
+.action-card {
+  display: grid;
+  gap: 0.8rem;
+  padding: 1.2rem;
+  border: 1px solid #d6e0dd;
+  border-radius: 12px;
+  background: #fff;
+  margin: 1rem 0;
+}
+.action-card blockquote {
+  border-left: 3px solid #abc9bf;
+  padding-left: 1rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.action-filters,
+.meeting-list {
+  display: flex;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+.transcript-lines {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding-left: 3rem;
+}
+.phase3-panel details {
+  border-top: 1px solid #d6e0dd;
+  padding: 1rem 0;
+}
+@media (max-width: 700px) {
+  .action-card {
+    padding: 0.8rem;
+  }
+  .action-filters {
+    display: grid;
+  }
+}

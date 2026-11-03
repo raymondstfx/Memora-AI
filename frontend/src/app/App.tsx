@@ -18,6 +18,9 @@ import {
 import { HealthPanel } from "../features/health/HealthPanel";
 import { Button } from "../components/ui/button";
 import { ChatPanel } from "../features/chat/ChatPanel";
+import { MeetingPanel } from "../features/meetings/MeetingPanel";
+import { MemoryPanel } from "../features/memory/MemoryPanel";
+import { ActionsPanel } from "../features/meetings/ActionsPanel";
 import { KnowledgePanel } from "../features/knowledge/KnowledgePanel";
 
 const pages = [
@@ -136,7 +139,7 @@ export function App() {
             <div className="progress-track">
               <span />
             </div>
-            <small>Phase 2 of 6</small>
+            <small>Phase 4 of 6</small>
           </div>
           <a
             className="help-link"
@@ -173,7 +176,7 @@ export function App() {
             <strong>{active}</strong>
           </div>
           <span className="phase-badge">
-            <span className="status-dot" /> Phase 2 · PDF knowledge
+            <span className="status-dot" /> Phase 4 · Evidence & memory
           </span>
         </header>
         <main id="main">
@@ -181,8 +184,22 @@ export function App() {
           <div className="page-heading">
             <h1>{active === "Settings" ? "Workspace settings" : active}</h1>
             <span className="outline-badge">
-              {active === "Chat" || active === "Knowledge Base"
-                ? "Streaming chat"
+              {[
+                "Chat",
+                "Knowledge Base",
+                "Meetings",
+                "Tasks & Actions",
+                "Memory",
+              ].includes(active)
+                ? active === "Meetings"
+                  ? "Meeting intelligence"
+                  : active === "Tasks & Actions"
+                    ? "Reviewed actions"
+                    : active === "Memory"
+                      ? "Evidence-backed memory"
+                      : active === "Knowledge Base"
+                        ? "PDF knowledge"
+                        : "Streaming chat"
                 : page.phase === 0
                   ? "Infrastructure"
                   : `Planned · Phase ${page.phase}`}
@@ -191,7 +208,13 @@ export function App() {
           <p className="page-description">
             A little less scattered. A lot more connected.
           </p>
-          {active !== "Chat" && active !== "Knowledge Base" && (
+          {![
+            "Chat",
+            "Knowledge Base",
+            "Meetings",
+            "Tasks & Actions",
+            "Memory",
+          ].includes(active) && (
             <section className="welcome-card">
               <div className="welcome-copy">
                 <span className="small-label">
@@ -226,6 +249,9 @@ export function App() {
             </section>
           )}
           {active === "Chat" && <ChatPanel />}
+          {active === "Meetings" && <MeetingPanel />}
+          {active === "Memory" && <MemoryPanel />}
+          {active === "Tasks & Actions" && <ActionsPanel />}
           {active === "Knowledge Base" && (
             <KnowledgePanel
               onAsk={(id) => {
@@ -239,7 +265,10 @@ export function App() {
           )}
           {active !== "Settings" &&
             active !== "Chat" &&
-            active !== "Knowledge Base" && (
+            active !== "Knowledge Base" &&
+            active !== "Meetings" &&
+            active !== "Tasks & Actions" &&
+            active !== "Memory" && (
               <section className="empty-state">
                 <span className="empty-icon">
                   <Icon size={25} strokeWidth={1.5} />

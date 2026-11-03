@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { HealthPanel } from "../features/health/HealthPanel";
 import { Button } from "../components/ui/button";
+import { ChatPanel } from "../features/chat/ChatPanel";
+import { KnowledgePanel } from "../features/knowledge/KnowledgePanel";
 
 const pages = [
   {
@@ -24,8 +26,7 @@ const pages = [
     icon: MessageSquare,
     phase: 1,
     text: "A conversation with everything you know.",
-    detail:
-      "Streaming conversations and saved history will be available in Phase 1.",
+    detail: "Streaming conversations with locally persisted history.",
   },
   {
     title: "Knowledge Base",
@@ -33,7 +34,7 @@ const pages = [
     phase: 2,
     text: "Give your knowledge a place to connect.",
     detail:
-      "Document uploads, grounded answers and page citations arrive in Phase 2.",
+      "Upload PDFs, track indexing and ask grounded questions with page citations.",
   },
   {
     title: "Meetings",
@@ -131,11 +132,11 @@ export function App() {
               <span className="status-dot" /> FOUNDATION
             </span>
             <strong>A thoughtful start.</strong>
-            <p>Your workspace is taking shape. Phase 0 sets the foundation.</p>
+            <p>Chat and saved sessions. Configure your model to get started.</p>
             <div className="progress-track">
               <span />
             </div>
-            <small>Phase 0 of 6</small>
+            <small>Phase 2 of 6</small>
           </div>
           <a
             className="help-link"
@@ -172,7 +173,7 @@ export function App() {
             <strong>{active}</strong>
           </div>
           <span className="phase-badge">
-            <span className="status-dot" /> Phase 0 preview
+            <span className="status-dot" /> Phase 2 · PDF knowledge
           </span>
         </header>
         <main id="main">
@@ -180,68 +181,86 @@ export function App() {
           <div className="page-heading">
             <h1>{active === "Settings" ? "Workspace settings" : active}</h1>
             <span className="outline-badge">
-              {page.phase === 0
-                ? "Infrastructure"
-                : `Planned · Phase ${page.phase}`}
+              {active === "Chat" || active === "Knowledge Base"
+                ? "Streaming chat"
+                : page.phase === 0
+                  ? "Infrastructure"
+                  : `Planned · Phase ${page.phase}`}
             </span>
           </div>
           <p className="page-description">
             A little less scattered. A lot more connected.
           </p>
-          <section className="welcome-card">
-            <div className="welcome-copy">
-              <span className="small-label">
-                <Sparkles size={15} /> SPACE FOR YOUR NEXT IDEA
-              </span>
-              <h2>{page.text}</h2>
-              <p>{page.detail}</p>
-              <span className="foundation-note">
-                <span className="status-dot" />{" "}
-                {page.phase === 0
-                  ? "Live infrastructure checks below"
-                  : "Coming in a later phase"}
-              </span>
-            </div>
-            <div className="knowledge-art" aria-hidden="true">
-              <div className="orbit orbit-one" />
-              <div className="orbit orbit-two" />
-              <span className="art-node node-one">
-                <BookOpen size={23} />
-              </span>
-              <span className="art-node node-two">
-                <MessageSquare size={22} />
-              </span>
-              <span className="art-node node-three">
-                <CheckSquare size={22} />
-              </span>
-              <span className="art-center">
-                <Layers size={44} strokeWidth={1.4} />
-              </span>
-              <span className="art-spark">✦</span>
-            </div>
-          </section>
-          {active !== "Settings" && (
-            <section className="empty-state">
-              <span className="empty-icon">
-                <Icon size={25} strokeWidth={1.5} />
-              </span>
-              <h2>
-                {active === "Chat"
-                  ? "Your next chapter starts here"
-                  : `Your ${active.toLowerCase()} will live here`}
-              </h2>
-              <p>
-                {page.detail} This preview contains the navigation shell and
-                local infrastructure.
-              </p>
-              <Button disabled>
-                <Icon size={16} /> Available in Phase {page.phase}
-              </Button>
-              <span className="empty-footnote">
-                No AI providers are called in this preview.
-              </span>
+          {active !== "Chat" && active !== "Knowledge Base" && (
+            <section className="welcome-card">
+              <div className="welcome-copy">
+                <span className="small-label">
+                  <Sparkles size={15} /> SPACE FOR YOUR NEXT IDEA
+                </span>
+                <h2>{page.text}</h2>
+                <p>{page.detail}</p>
+                <span className="foundation-note">
+                  <span className="status-dot" />{" "}
+                  {page.phase === 0
+                    ? "Live infrastructure checks below"
+                    : "Coming in a later phase"}
+                </span>
+              </div>
+              <div className="knowledge-art" aria-hidden="true">
+                <div className="orbit orbit-one" />
+                <div className="orbit orbit-two" />
+                <span className="art-node node-one">
+                  <BookOpen size={23} />
+                </span>
+                <span className="art-node node-two">
+                  <MessageSquare size={22} />
+                </span>
+                <span className="art-node node-three">
+                  <CheckSquare size={22} />
+                </span>
+                <span className="art-center">
+                  <Layers size={44} strokeWidth={1.4} />
+                </span>
+                <span className="art-spark">✦</span>
+              </div>
             </section>
           )}
+          {active === "Chat" && <ChatPanel />}
+          {active === "Knowledge Base" && (
+            <KnowledgePanel
+              onAsk={(id) => {
+                const url = new URL(window.location.href);
+                url.searchParams.set("documents", id);
+                url.searchParams.delete("conversation");
+                window.history.replaceState(null, "", url);
+                setActive("Chat");
+              }}
+            />
+          )}
+          {active !== "Settings" &&
+            active !== "Chat" &&
+            active !== "Knowledge Base" && (
+              <section className="empty-state">
+                <span className="empty-icon">
+                  <Icon size={25} strokeWidth={1.5} />
+                </span>
+                <h2>
+                  {active === "Chat"
+                    ? "Your next chapter starts here"
+                    : `Your ${active.toLowerCase()} will live here`}
+                </h2>
+                <p>
+                  {page.detail} This preview contains the navigation shell and
+                  local infrastructure.
+                </p>
+                <Button disabled>
+                  <Icon size={16} /> Available in Phase {page.phase}
+                </Button>
+                <span className="empty-footnote">
+                  This feature is unavailable in Phase 1.
+                </span>
+              </section>
+            )}
           <HealthPanel />
           <footer className="page-footer">
             <span>MEMORA AI</span>

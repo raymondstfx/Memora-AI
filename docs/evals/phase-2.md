@@ -2,6 +2,11 @@
 
 Date: November 3, 2026 (Asia/Shanghai).
 
+Latest model resolution: `gemini-3.1-flash-lite` / `reasoning_effort=minimal`
+passed a bounded real streaming chat and PDF answer/page-citation smoke. See
+[the exact five-request record](gemini-model-resolution.md). Full live gates
+remain pending the additional persistence/restart/browser checks.
+
 Gemini follow-up: see [the measured compatibility report](gemini-compatibility.md).
 Four real requests were subsequently authorized and sent. Real 768-dimensional
 Embedding ingestion/storage and hybrid retrieval passed on a tiny PDF; the

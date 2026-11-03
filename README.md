@@ -11,13 +11,14 @@ Chat streams through a backend provider adapter, saves conversations and partial
 responses in Postgres, and restores history on reload/restart. LangGraph
 checkpoints persist server-side. Missing credentials produce a configuration
 notice; there are no simulated production answers. Real external API acceptance
-is pending successful model access. PDF upload, asynchronous parsing/indexing,
+has passed a bounded Gemini streaming/RAG smoke test. PDF upload, asynchronous parsing/indexing,
 hybrid retrieval and page citations are implemented. Meetings, durable semantic
 memory, email, web search and presentations belong to later phases. Both real
 Phase 1 model and Phase 2 full RAG acceptance remain pending verification.
 The Gemini follow-up verified real 768-dimensional embeddings and hybrid retrieval
-on a tiny PDF; the requested chat model returned HTTP 404. See the
-[measured Gemini report](docs/evals/gemini-compatibility.md).
+on a tiny PDF. The subsequent 404 fix selected `gemini-3.1-flash-lite` from the
+official model list and passed streaming plus a page-verified RAG answer. See
+[the model-resolution report](docs/evals/gemini-model-resolution.md).
 
 ## Architecture
 
@@ -81,11 +82,11 @@ has comments and empty/obvious placeholders:
 
 ```dotenv
 LLM_PROVIDER=openai_compatible
-LLM_MODEL=gemini-2.5-flash-lite
+LLM_MODEL=gemini-3.1-flash-lite
 LLM_API_KEY=
 LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
 LLM_TOKEN_PARAMETER=max_tokens
-LLM_REASONING_EFFORT=none
+LLM_REASONING_EFFORT=minimal
 ```
 
 Paste your Key after `LLM_API_KEY=` and replace `LLM_MODEL` with a model ID that
@@ -108,8 +109,8 @@ use `VITE_*` for API credentials. User messages go to your configured model
 provider when you explicitly send or retry. Chat content is rendered as text.
 
 The checked-in template now targets Gemini's official OpenAI-compatible endpoint,
-with `gemini-2.5-flash-lite`, thinking disabled by the actual JSON field
-`reasoning_effort: "none"`, and `gemini-embedding-001` requested at 768 dimensions.
+with `gemini-3.1-flash-lite`, minimum supported thinking via the actual JSON field
+`reasoning_effort: "minimal"` (not disabled), and `gemini-embedding-001` requested at 768 dimensions.
 Set both backend Key variables locally (the same Gemini Key can be used for both).
 See [Gemini setup and measured verification](docs/evals/gemini-compatibility.md).
 
@@ -293,7 +294,7 @@ Gemini-specific controls in the same root `.env` / `.env.example`:
 | `LLM_TOKEN_PARAMETER` | 25 | Sends `max_tokens` |
 | `LLM_MAX_CONCURRENT_REQUESTS` | 35 | One active chat call per supported API process |
 | `EMBEDDING_BATCH_SIZE` | 50 | Up to 8 strings in each `input` array |
-| `LLM_REASONING_EFFORT` | 73 | Sends `none`; disables Gemini 2.5 thinking |
+| `LLM_REASONING_EFFORT` | 73 | Sends `minimal` for Gemini 3.1 Flash-Lite; do not use `none` |
 | `PROVIDER_RETRY_MAX_WAIT_SECONDS` | 75 | At most 15 seconds per retry; longer server hints stop |
 | `EMBEDDING_NORMALIZE` | 77 | Client-side L2 normalization; changes index identity |
 | `EMBEDDING_MAX_INPUT_BYTES` | 80 | Conservative chunk/query byte guard, not a wire parameter |
@@ -378,8 +379,10 @@ acceptance pass.
 
 **Phase 1 real chat model: pending. Phase 2 full RAG: pending.** Real Gemini
 Embedding dimensions/storage/retrieval passed a tiny synthetic-PDF smoke test;
-the requested `gemini-2.5-flash-lite` returned HTTP 404, so no real grounded answer
-was accepted. After selecting a model accessible to your project, upload the
+a subsequent switch to `gemini-3.1-flash-lite` passed one real streaming chat and
+one grounded answer with page-1 evidence. This bounded smoke does not replace
+full live persistence/cancellation/restart acceptance. For additional owner-approved
+verification, upload the
 generated project brief (or your own known
 PDF), wait for ready, ask its API deadline and check filename/page/excerpt against
 the original. Reload, restart containers, repeat retrieval, then test a model or

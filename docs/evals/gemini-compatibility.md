@@ -2,6 +2,11 @@
 
 Date: November 3, 2026 (Asia/Shanghai). No Phase 3 features added.
 
+Subsequent resolution: [model discovery and bounded live verification](gemini-model-resolution.md)
+selected `gemini-3.1-flash-lite` with `minimal` thinking and passed streaming plus
+a page-verified RAG answer. Configuration tables below preserve the earlier 404
+investigation; use the resolution report for current model/thinking settings.
+
 ## Result and exact live request accounting
 
 The owner supplied backend-only local credentials and explicitly authorized

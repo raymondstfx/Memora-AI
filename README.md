@@ -6,19 +6,120 @@ Memora AI is being built as a local-first AI knowledge workspace, bringing
 conversations, document evidence, meeting insights, durable memory, approved
 actions, and editable presentations into one place.
 
-**Current implementation: Phase 2 — PDF ingestion and grounded retrieval.**
+**Current implementation: Phase 4 — durable memory with dated evidence.**
 Chat streams through a backend provider adapter, saves conversations and partial
 responses in Postgres, and restores history on reload/restart. LangGraph
 checkpoints persist server-side. Missing credentials produce a configuration
 notice; there are no simulated production answers. Real external API acceptance
 has passed a bounded Gemini streaming/RAG smoke test. PDF upload, asynchronous parsing/indexing,
-hybrid retrieval and page citations are implemented. Meetings, durable semantic
-memory, email, web search and presentations belong to later phases. Both real
+hybrid retrieval and page citations are implemented. Meetings, tasks and approved
+mail transport and durable semantic/episodic memory are implemented. Web search
+and presentations belong to later phases. Both real
 Phase 1 model and Phase 2 full RAG acceptance remain pending verification.
 The Gemini follow-up verified real 768-dimensional embeddings and hybrid retrieval
 on a tiny PDF. The subsequent 404 fix selected `gemini-3.1-flash-lite` from the
 official model list and passed streaming plus a page-verified RAG answer. See
 [the model-resolution report](docs/evals/gemini-model-resolution.md).
+
+## Phase 3: meetings, tasks and approved email
+
+Meetings accepts UTF-8 TXT (optional BOM), preserves line evidence, extracts
+people/decisions/risks/task proposals and shows background stages and failures.
+Date/timezone headers or form fields anchor relative deadlines. Unknown owners,
+roles and dates remain reviewable. Tasks & Actions supports filters and editing.
+Risk emails are editable drafts with explicitly chosen recipients. Saving never
+sends; approval binds the saved revision and is idempotent. Ambiguous SMTP
+outcomes require reconciliation and never automatically resend.
+
+SMTP uses **local capture** in the supplied configuration; external sending is
+false. Start the application together with the local mailbox:
+
+```powershell
+docker compose --profile app --profile mail up --build -d --wait
+```
+
+For a local capture mailbox only, set these backend root `.env` values, then
+start/recreate with the optional Mailpit profile:
+
+```dotenv
+SMTP_MODE=local
+SMTP_HOST=127.0.0.1
+SMTP_DOCKER_HOST=mailpit
+SMTP_PORT=1025
+SMTP_FROM=memora@example.test
+SMTP_SECURITY=none
+SMTP_EXTERNAL_SEND_ENABLED=false
+DEMO_ALLOWED_RECIPIENTS=demo@example.test
+```
+
+```powershell
+docker compose --profile app --profile mail up --build -d --wait
+```
+
+Open [Mailpit](http://localhost:8025) to inspect captured messages. No external
+relay is configured. For hybrid development, the local API uses SMTP_HOST and
+container workers use SMTP_DOCKER_HOST. Review the draft, save edits, check the
+approval checkbox and press **Approve & send email**. Repeated approval does
+not send again. `sent` means SMTP accepted the message, not external inbox receipt.
+External delivery was not authorized or tested. Keep the external flag false.
+
+New settings in `.env` / `.env.example` have matching line positions:
+
+| Setting | Line | Purpose |
+| --- | --- | --- |
+| SMTP_HOST / SMTP_PORT | 67 / 68 | Local backend SMTP host and port |
+| SMTP_USERNAME / SMTP_PASSWORD | 69 / 70 | Optional server-only credentials; blank placeholders |
+| DEMO_ALLOWED_RECIPIENTS | 71 | Explicit comma-separated recipient allowlist |
+| MEETING_MAX_UPLOAD_BYTES / MEETING_MAX_INPUT_BYTES | 88 / 89 | File/context byte caps |
+| MEETING_MAX_OUTPUT_TOKENS / MEETING_REPAIR_ATTEMPTS | 90 / 92 | Extraction output cap and at most one schema repair |
+| SMTP_MODE | 95 | local capture; disabled also supported |
+| SMTP_DOCKER_HOST / SMTP_FROM | 97 / 98 | Container SMTP host and explicit sender |
+| SMTP_SECURITY / SMTP_TIMEOUT_SECONDS | 99 / 100 | none for local capture; TLS for external transport |
+| SMTP_EXTERNAL_SEND_ENABLED | 102 | false; additional external-delivery guard |
+| MAILPIT_SMTP_PORT / MAILPIT_HTTP_PORT | 104 / 105 | Loopback capture server ports |
+
+Verified Gemini and Embedding settings remain unchanged: LLM model/Key/Base URL
+at lines 19/21/23, thinking `minimal` at 73, Embedding Key/Base URL/model/dimensions
+at 38/40/43/44. No index rebuild is needed. TXT is not sent to Embedding.
+
+Phase 3 automated verification uses independent test providers and real local
+Postgres/Redis/RQ/Mailpit. A historical real extraction attempt returned HTTP 503.
+The bounded follow-up passed with one real Gemini request, including persisted
+people, meeting date, risk, dated tasks and validated evidence; no retry was used.
+See [the Phase 3 report](docs/evals/phase-3.md) for exact results and limits, and
+[the API/state contract](docs/api/phase-3.md). Test sources/runners stay local and
+ignored under the owner's publication preference.
+
+## Phase 4: durable memory
+
+The Memory page lists source-linked facts, semantic/episodic types, event and
+recording times, current/history/conflict states, and original meeting lines.
+New meeting publication stores memory atomically with tasks and risks. Existing
+ready meetings can be imported in batches with **Import saved meetings**; this
+uses their saved extraction and checksum-verified originals, with no new model
+or Embedding requests and no index rebuild. Repeating import is idempotent.
+
+Only exact Unicode, case and space normalization is automatic. Explicitly confirm
+aliases or identity merges in the Memory page; similar names remain distinct.
+Conflicting same-time facts are shown for review. Later event times supersede
+older values without overwriting source history, even when uploaded out of order.
+Corrections append a version and reason, while revocation removes facts from
+recall and preserves a suppression record. Re-import never restores a revoked
+or corrected source fact. This is soft deletion, not physical evidence erasure.
+
+Create a new chat and ask **Who owns the API and how did its deadline change?**
+after importing the Nov 2/Nov 4 sample meetings. The answer identifies Alex and
+the Nov 5 → Nov 8 change, with dated meeting citations and original TXT links.
+Exact owner/deadline questions use stored relational/time records; general memory
+questions use indexed full-text retrieval and the existing grounded model flow.
+No model fallback fabricates a missing fact. Explicit user assertions can also be
+saved with `Remember: API owner is Alex` or `Remember: API deadline is 2026-11-08`;
+ordinary chat and assistant guesses are not promoted to durable facts.
+
+No new provider configuration is required. Existing Gemini/Embedding settings,
+caches, concurrency and finite retries are retained. Root `.env` stays ignored.
+See [Phase 4 acceptance](docs/evals/phase-4.md) and
+[the memory API contract](docs/api/phase-4.md). Phase 5 is not implemented.
 
 ## Architecture
 
@@ -59,7 +160,7 @@ Copy-Item .env.example .env
 On macOS/Linux, use `cp .env.example .env`. Then start the complete stack:
 
 ```sh
-docker compose --profile app up --build -d --wait
+docker compose --profile app --profile mail up --build -d --wait
 ```
 
 Open [the workspace](http://localhost:5173), [API documentation](http://localhost:8000/docs),
@@ -100,7 +201,7 @@ Key. Infrastructure health does not depend on model access.
 Compose injects these variables only on the backend. After editing `.env`:
 
 ```sh
-docker compose --profile app up --build -d --wait
+docker compose --profile app --profile mail up --build -d --wait
 ```
 
 For hybrid development, stop and restart the local API process after changing
@@ -341,7 +442,7 @@ another provider setting. `.env.example` contains placeholders/comments only.
 After editing configuration, recreate **both API and worker**:
 
 ```sh
-docker compose --profile app up --build -d --wait
+docker compose --profile app --profile mail up --build -d --wait
 ```
 
 Select ready PDFs in Chat or click **Ask this PDF**. Source cards identify the
@@ -438,12 +539,12 @@ bodies, credentials or raw dependency exceptions.
 0. Skeleton and local infrastructure — delivered.
 1. Streaming chat and persisted sessions — implemented; real API gate pending Key.
 2. PDF ingestion and grounded retrieval — implemented; real Embedding/RAG gate pending.
-3. Meeting intelligence, tasks, and approved email.
+3. Meeting intelligence, tasks, and approved email — implemented; real extraction gate pending.
 4. Durable, time-aware memory.
 5. Live search and PowerPoint generation.
 6. Hardening and complete demonstration.
 
 Development stops at each phase gate for owner approval. See [AGENTS.md](AGENTS.md)
-for contributor commands and migration discipline. The owner authorized publishing
-the completed Phase 1/2 work; Phase 3 still requires separate approval.
-See [the Phase 2 API contract](docs/api/phase-2.md).
+for contributor commands and migration discipline. Phase 3 is the current boundary;
+Phase 4 and publication of this phase require separate owner approval.
+See [the Phase 3 API contract](docs/api/phase-3.md).

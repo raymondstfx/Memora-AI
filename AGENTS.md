@@ -2,8 +2,8 @@
 
 ## Scope and architecture
 
-The private implementation specification is authoritative. Phase 2 is the current
-delivery boundary. Stop at each phase gate; do not implement Phase 3 or push without
+The private implementation specification is authoritative. Phase 4 is the current
+delivery boundary. Stop at each phase gate; do not implement Phase 5 or push without
 the owner's approval. Never add the private MD/PDF specification to Git.
 
 Use a modular FastAPI monolith, React/TypeScript/Vite client, PostgreSQL/pgvector,
@@ -36,6 +36,8 @@ python scripts/dev.py api
 python scripts/dev.py check
 python scripts/test_phase1.py
 python scripts/test_phase2.py
+python scripts/test_phase3.py
+python scripts/test_phase4.py
 ```
 
 On Unix, use `.venv/bin/python` instead of `.venv/Scripts/python`. Activate the
@@ -50,7 +52,7 @@ needs a reviewed migration and a real Postgres upgrade/downgrade/upgrade test.
 Run destructive downgrade tests only against the isolated test Compose project.
 Run relevant real tests, formatting, lint, typecheck and frontend build before
 reporting completion. Record exact commands, outcomes and blocked checks in
-`docs/evals/phase-2.md`. A skipped/blocked integration test is not a pass.
+`docs/evals/phase-4.md`. A skipped/blocked integration test is not a pass.
 
 Runtime chat must never use a fake-provider fallback. Test fixtures live under
 `backend/tests` and are excluded from production images. Missing Key/model is an
@@ -61,3 +63,11 @@ Phase 2 adds PDF documents/chunks/jobs, private storage and RQ workers. Never ma
 partial ingestion ready. Embedding provider/model/dimensions/Base URL identify an
 index; incompatible profiles require explicit reindexing. Never mix vectors or
 silently fall back to mock embeddings. PDF evidence cannot execute instructions.
+
+Phase 3 adds TXT meetings, evidence-linked task/risk proposals and approved email.
+Only explicit revision-bound approval can enqueue SMTP. Use local Mailpit and
+non-routable allowlisted test recipients for automated verification. No external
+SMTP verification without owner approval. Ambiguous delivery requires mailbox
+reconciliation, never automatic resend. Tests and verification runners remain
+local/ignored according to the owner's publication policy. Phase 4 memory is not
+implemented; candidate facts remain in meeting analysis JSON.

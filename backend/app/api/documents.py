@@ -19,6 +19,7 @@ from app.schemas.health import ErrorResponse
 from app.services.documents import DocumentService
 from app.services.embedding import embedding_configuration
 from app.services.llm.provider import ChatError
+from app.services.presentations import PresentationService
 
 router = APIRouter(
     prefix="/api",
@@ -124,4 +125,11 @@ def remove(identifier: UUID, request: Request, owner: Owner) -> Response:
 
 @router.get("/jobs/{identifier}", response_model=JobOut)
 def job(identifier: UUID, request: Request, owner: Owner) -> JobOut:
-    return service(request).job(owner, identifier)
+    try:
+        return service(request).job(owner, identifier)
+    except ChatError as exc:
+        if exc.code != "NOT_FOUND":
+            raise
+        return cast(PresentationService, request.app.state.presentations).job(
+            owner, identifier
+        )

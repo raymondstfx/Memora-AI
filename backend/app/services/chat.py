@@ -23,6 +23,7 @@ from app.services.documents import DocumentService
 from app.services.llm.provider import ChatError, Provider, configuration
 from app.services.memories import MemoryService
 from app.services.rag import grounded_answer
+from app.services.search import SearchService
 
 
 def bounded_context(
@@ -168,6 +169,16 @@ class ChatService:
         retry_id: UUID | None = None,
     ) -> Turn:
         self.ensure_configured()
+        if (
+            body
+            and body.message.casefold().startswith("/search ")
+            and not self.settings.search_api_key.get_secret_value().strip()
+        ):
+            raise ChatError(
+                "SEARCH_NOT_CONFIGURED",
+                "Set SEARCH_API_KEY in root .env before /search.",
+                503,
+            )
         with self.sessions.begin() as db:
             db.execute(
                 insert(User)
@@ -370,7 +381,9 @@ class ChatService:
         error_code: str | None = None
         try:
             async with asyncio.timeout(self.settings.llm_total_timeout_seconds):
-                if turn.document_ids:
+                if turn.prompt[-1]["content"].casefold().startswith("/search "):
+                    tokens = self.web_tokens(turn, queue)
+                elif turn.document_ids:
                     tokens = self.rag_tokens(turn, queue)
                 elif self.memories:
                     tokens = self.memory_tokens(turn, queue)
@@ -639,3 +652,92 @@ class ChatService:
     def encode(event: StreamEvent) -> str:
         data = event.model_dump(mode="json", exclude_none=True)
         return f"event: {event.event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+    async def web_tokens(
+        self, turn: Turn, queue: asyncio.Queue[StreamEvent | None]
+    ) -> AsyncIterator[str]:
+        if not self.documents:
+            raise ChatError(
+                "SEARCH_UNAVAILABLE", "Search infrastructure is unavailable.", 503
+            )
+        query = turn.prompt[-1]["content"][8:].strip()
+        if not 2 <= len(query) <= 500:
+            raise ChatError(
+                "SEARCH_QUERY_INVALID", "Use /search followed by 2-500 characters.", 422
+            )
+        await queue.put(
+            StreamEvent(
+                event="tool_start",
+                conversation_id=turn.conversation_id,
+                message_id=turn.message_id,
+                message="Searching live web sources.",
+            )
+        )
+        result = await asyncio.to_thread(
+            SearchService(self.settings, self.documents.redis).search,
+            turn.user_id,
+            query,
+        )
+        sources = [
+            SourceCitation(
+                key=f"web:{i}",
+                label=i,
+                filename=s.title,
+                excerpt=s.snippet,
+                source_type="external_web",
+                score=1,
+                url=s.url,
+                retrieved_at=s.retrieved_at,
+                published_at=s.published_at,
+            )
+            for i, s in enumerate(result.sources, 1)
+        ]
+        turn.tool_calls = [
+            {
+                "name": "search_web",
+                "result_count": len(sources),
+                "cached": result.cached,
+            }
+        ]
+        await queue.put(
+            StreamEvent(
+                event="tool_result",
+                conversation_id=turn.conversation_id,
+                message_id=turn.message_id,
+                message=f"Retrieved {len(sources)} web sources with retrieval times.",
+            )
+        )
+        if not sources:
+            text = "No web search results found. No live facts established."
+        else:
+            parent = self
+
+            class CheckpointedProvider:
+                async def stream(
+                    self, messages: list[dict[str, str]]
+                ) -> AsyncIterator[str]:
+                    async for token in stream_graph(
+                        parent.provider,
+                        parent.saver,
+                        f"{turn.user_id}:{turn.conversation_id}",
+                        messages,
+                    ):
+                        yield token
+
+            text, turn.sources = await grounded_answer(
+                CheckpointedProvider(),
+                query,
+                sources,
+                self.settings.llm_context_token_budget,
+            )
+        for source in turn.sources:
+            await queue.put(
+                StreamEvent(
+                    event="citation",
+                    conversation_id=turn.conversation_id,
+                    message_id=turn.message_id,
+                    source=source.model_dump(mode="json"),
+                )
+            )
+        for offset in range(0, len(text), 40):
+            yield text[offset : offset + 40]

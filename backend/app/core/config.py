@@ -21,6 +21,16 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
     dependency_timeout_seconds: int = Field(default=3, ge=1, le=10)
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
+    search_api_key: SecretStr = SecretStr("")
+    search_base_url: str = "https://api.tavily.com"
+    search_max_results: int = Field(default=5, ge=1, le=5)
+    search_timeout_seconds: int = Field(default=15, ge=1, le=30)
+    search_cache_ttl_seconds: int = Field(default=300, ge=0, le=3600)
+    presentation_max_output_tokens: int = Field(default=6000, ge=1024, le=8192)
+    presentation_job_timeout_seconds: int = Field(default=240, ge=30, le=600)
+    presentation_conversion_timeout_seconds: int = Field(default=90, ge=10, le=180)
+    presentation_node: str = "node"
+    presentation_libreoffice: str = "libreoffice"
     llm_provider: str = "openai_compatible"
     llm_reasoning_effort: Literal["", "none", "minimal", "low", "medium", "high"] = ""
     provider_retry_max_wait_seconds: float = Field(default=15, ge=0, le=30)

@@ -72,6 +72,9 @@ class SourceCitation(BaseModel):
     memory_status: str | None = None
     conversation_id: UUID | None = None
     message_id: UUID | None = None
+    url: str | None = None
+    retrieved_at: datetime | None = None
+    published_at: str | None = None
 
 
 class SearchRequest(BaseModel):

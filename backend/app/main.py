@@ -22,6 +22,7 @@ from app.api.documents import router as documents_router
 from app.api.health import router
 from app.api.meetings import router as meetings_router
 from app.api.memories import router as memories_router
+from app.api.presentations import router as presentations_router
 from app.core.config import Settings, get_settings
 from app.core.errors import error_response, install_error_handlers
 from app.core.logging import configure_logging
@@ -34,6 +35,7 @@ from app.services.emails import EmailService
 from app.services.llm.provider import OpenAICompatibleProvider
 from app.services.meetings import MeetingService
 from app.services.memories import MemoryService
+from app.services.presentations import PresentationService
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -73,6 +75,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.checkpoint_pool.open()
         app.state.documents = DocumentService(app.state.engine, config)
         app.state.meetings = MeetingService(app.state.engine, config)
+        app.state.presentations = PresentationService(app.state.engine, config)
         app.state.emails = EmailService(app.state.engine, config)
         app.state.memories = MemoryService(app.state.engine, config)
         app.state.chat = ChatService(
@@ -103,6 +106,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             app.state.documents.redis.close()
             app.state.meetings.redis.close()
             app.state.emails.redis.close()
+            app.state.presentations.redis.close()
             app.state.engine.dispose()
 
     app = FastAPI(title="Memora AI API", version="0.1.0", lifespan=lifespan)
@@ -148,6 +152,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(documents_router)
     app.include_router(meetings_router)
     app.include_router(memories_router)
+    app.include_router(presentations_router)
 
     def openapi() -> dict[str, Any]:
         if app.openapi_schema is None:

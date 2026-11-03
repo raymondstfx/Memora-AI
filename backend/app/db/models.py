@@ -379,3 +379,20 @@ class EntityRelation(Timestamps, Base):
     to_entity_id: Mapped[UUID] = mapped_column(ForeignKey("entities.id"), index=True)
     relation: Mapped[str] = mapped_column(String(50))
     memory_id: Mapped[UUID] = mapped_column(ForeignKey("memories.id"), index=True)
+
+
+class Presentation(Timestamps, Base):
+    __tablename__ = "presentations"
+    __table_args__ = (UniqueConstraint("user_id", "request_key"),)
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    request_key: Mapped[UUID] = mapped_column(Uuid)
+    request_json: Mapped[dict[str, object]] = mapped_column(JSON)
+    outline_json: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
+    sources_json: Mapped[list[dict[str, object]]] = mapped_column(JSON, default=list)
+    status: Mapped[str] = mapped_column(String(30), default="queued")
+    stage: Mapped[str] = mapped_column(String(30), default="queued")
+    progress: Mapped[int] = mapped_column(Integer, default=0)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    error_code: Mapped[str | None] = mapped_column(String(60))
+    page_count: Mapped[int | None] = mapped_column(Integer)

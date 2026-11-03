@@ -37,6 +37,8 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
+      args:
+        APT_MIRROR: ${APT_MIRROR:-http://deb.debian.org}
     environment: &backend-env
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-memora}:${POSTGRES_PASSWORD:-memora_local_only}@postgres:5432/${POSTGRES_DB:-memora}
       REDIS_URL: redis://redis:6379/0
@@ -85,6 +87,16 @@ services:
       SMTP_EXTERNAL_SEND_ENABLED: ${SMTP_EXTERNAL_SEND_ENABLED:-false}
       DEMO_ALLOWED_RECIPIENTS: ${DEMO_ALLOWED_RECIPIENTS:-}
       SMTP_HOST: ${SMTP_DOCKER_HOST:-mailpit}
+      SEARCH_API_KEY: ${SEARCH_API_KEY:-}
+      SEARCH_BASE_URL: ${SEARCH_BASE_URL:-https://api.tavily.com}
+      SEARCH_MAX_RESULTS: ${SEARCH_MAX_RESULTS:-5}
+      SEARCH_TIMEOUT_SECONDS: ${SEARCH_TIMEOUT_SECONDS:-15}
+      SEARCH_CACHE_TTL_SECONDS: ${SEARCH_CACHE_TTL_SECONDS:-300}
+      PRESENTATION_MAX_OUTPUT_TOKENS: ${PRESENTATION_MAX_OUTPUT_TOKENS:-6000}
+      PRESENTATION_JOB_TIMEOUT_SECONDS: ${PRESENTATION_JOB_TIMEOUT_SECONDS:-240}
+      PRESENTATION_CONVERSION_TIMEOUT_SECONDS: ${PRESENTATION_CONVERSION_TIMEOUT_SECONDS:-90}
+      PRESENTATION_NODE: ${PRESENTATION_NODE:-node}
+      PRESENTATION_LIBREOFFICE: ${PRESENTATION_LIBREOFFICE:-libreoffice}
       STORAGE_ROOT: /data/private
       PDF_MAX_UPLOAD_BYTES: ${PDF_MAX_UPLOAD_BYTES:-20971520}
       PDF_MAX_PAGES: ${PDF_MAX_PAGES:-100}
@@ -107,6 +119,8 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
+      args:
+        APT_MIRROR: ${APT_MIRROR:-http://deb.debian.org}
     environment: *backend-env
     volumes:
       - private_files:/data/private
@@ -129,6 +143,8 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
+      args:
+        APT_MIRROR: ${APT_MIRROR:-http://deb.debian.org}
     environment: *backend-env
     volumes:
       - private_files:/data/private

@@ -1,3 +1,4 @@
+import { getLanguage } from "../../i18n";
 import type { components } from "../../types/api.generated";
 
 export type ChatEvent = components["schemas"]["StreamEvent"];
@@ -48,7 +49,13 @@ export async function readEvents(
 }
 
 export async function api<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`/api${path}`, options);
+  const response = await fetch(`/api${path}`, {
+    ...options,
+    headers: {
+      ...Object.fromEntries(new Headers(options?.headers)),
+      "Accept-Language": getLanguage(),
+    },
+  });
   if (!response.ok) throw await responseError(response);
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;

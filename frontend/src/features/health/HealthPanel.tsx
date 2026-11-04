@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Activity, ArrowUpRight, CheckCircle2, RefreshCw } from "lucide-react";
 import { getHealth, type HealthResponse } from "../../lib/api";
@@ -19,7 +20,7 @@ export function HealthPanel() {
     const timeout = window.setTimeout(
       () =>
         controller.abort(
-          new DOMException("Health request timed out.", "TimeoutError"),
+          new DOMException(t("Health request timed out."), "TimeoutError"),
         ),
       15000,
     );
@@ -38,7 +39,7 @@ export function HealthPanel() {
             message:
               error instanceof Error
                 ? error.message
-                : "Unable to reach the API.",
+                : t("Unable to reach the API."),
           });
         }
       })
@@ -59,30 +60,31 @@ export function HealthPanel() {
           <Activity size={20} />
         </div>
         <div>
-          <h2 id="health-title">Local infrastructure</h2>
-          <p>Live readiness from your API</p>
+          <h2 id="health-title">{t("Local infrastructure")}</h2>
+          <p>{t("Live readiness from your API")}</p>
         </div>
         <Button
           variant="outline"
           onClick={refresh}
           disabled={state.status === "loading"}
-          aria-label="Refresh service health"
+          aria-label={t("Refresh service health")}
         >
-          <RefreshCw size={15} /> Refresh
+          <RefreshCw size={15} />
+          {t("Refresh")}
         </Button>
       </div>
       <div aria-live="polite" aria-busy={state.status === "loading"}>
         {state.status === "loading" && (
           <p className="health-notice">
-            Checking API, database, schema and queue connection…
+            {t("Checking API, database, schema and queue connection…")}
           </p>
         )}
         {state.status === "error" && (
           <div className="health-error" role="alert">
-            <strong>Services need attention</strong>
-            <p>{state.message}</p>
+            <strong>{t("Services need attention")}</strong>
+            <p>{t(state.message)}</p>
             <Button variant="outline" onClick={refresh}>
-              Try again
+              {t("Try again")}
             </Button>
           </div>
         )}
@@ -92,15 +94,15 @@ export function HealthPanel() {
               <div className="dependency" key={name}>
                 <span>
                   {name === "postgres"
-                    ? "PostgreSQL"
+                    ? t("PostgreSQL")
                     : name === "pgvector"
-                      ? "pgvector"
+                      ? t("pgvector")
                       : name === "schema"
-                        ? "Alembic schema"
-                        : "Redis"}
+                        ? t("Alembic schema")
+                        : t("Redis")}
                 </span>
                 <span className="ready">
-                  <CheckCircle2 size={14} /> {value}
+                  <CheckCircle2 size={14} /> {t(value)}
                 </span>
               </div>
             ))}
@@ -108,9 +110,10 @@ export function HealthPanel() {
         )}
       </div>
       <div className="panel-footer">
-        <span>Local dependencies · live status</span>
+        <span>{t("Local dependencies · live status")}</span>
         <a href="/docs" target="_blank" rel="noreferrer">
-          API reference <ArrowUpRight size={14} />
+          {t("API reference")}
+          <ArrowUpRight size={14} />
         </a>
       </div>
     </section>

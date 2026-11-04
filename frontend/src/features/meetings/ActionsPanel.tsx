@@ -1,6 +1,15 @@
+import { t, formatDate } from "../../i18n";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { components } from "../../types/api.generated";
 import { api } from "../chat/stream";
+import {
+  CheckSquare,
+  Mail,
+  CheckCircle2,
+  AlertCircle,
+  ShieldCheck,
+} from "lucide-react";
+import { Metrics } from "../../components/ui/metrics";
 import { Button } from "../../components/ui/button";
 
 type Task = components["schemas"]["TaskOut"];
@@ -22,7 +31,7 @@ export function TaskEditor({
   return (
     <form
       className="action-card"
-      aria-label={`Task ${task.title}`}
+      aria-label={t("Task {0}", { 0: task.title })}
       onSubmit={async (e) => {
         e.preventDefault();
         setBusy(true);
@@ -41,7 +50,7 @@ export function TaskEditor({
           onSaved();
         } catch (cause) {
           setError(
-            cause instanceof Error ? cause.message : "Unable to save task.",
+            cause instanceof Error ? cause.message : t("Unable to save task."),
           );
         } finally {
           setBusy(false);
@@ -49,9 +58,11 @@ export function TaskEditor({
       }}
     >
       <h3>{task.title}</h3>
-      {task.needs_review && <p>Needs review: confirm owner and deadline.</p>}
+      {task.needs_review && (
+        <p>{t("Needs review: confirm owner and deadline.")}</p>
+      )}
       <label>
-        Task title
+        {t("Task title")}
         <input
           required
           value={title}
@@ -60,7 +71,7 @@ export function TaskEditor({
         />
       </label>
       <label>
-        Owner
+        {t("Owner")}
         <input
           value={owner}
           maxLength={150}
@@ -68,7 +79,7 @@ export function TaskEditor({
         />
       </label>
       <label>
-        Due date/time (UTC)
+        {t("Due date/time (UTC)")}
         <input
           type="datetime-local"
           value={due}
@@ -76,20 +87,27 @@ export function TaskEditor({
         />
       </label>
       <label>
-        Task status
-        <select value={status} onChange={(e) => setStatus(e.target.value)}>
+        {t("Task status")}
+        <select
+          aria-label={t("Task status")}
+          value={status}
+          onChange={(e) => setStatus(e.target.value)}
+        >
           {["proposed", "open", "in_progress", "done", "cancelled"].map((v) => (
-            <option key={v}>{v}</option>
+            <option key={v} value={v}>
+              {t(v)}
+            </option>
           ))}
         </select>
       </label>
       <blockquote>
-        Lines {task.evidence_json.line_start}–{task.evidence_json.line_end}:{" "}
+        {t("Lines")}
+        {task.evidence_json.line_start}–{task.evidence_json.line_end}:{" "}
         {task.evidence_json.quote}
       </blockquote>
-      {error && <p role="alert">{error}</p>}
+      {error && <p role="alert">{t(error)}</p>}
       <Button disabled={busy} type="submit">
-        {busy ? "Saving…" : "Save task"}
+        {busy ? t("Saving…") : t("Save task")}
       </Button>
     </form>
   );
@@ -155,33 +173,40 @@ export function EmailEditor({
       onSaved();
     } catch (cause) {
       setError(
-        cause instanceof Error ? cause.message : "Unable to update email.",
+        cause instanceof Error ? cause.message : t("Unable to update email."),
       );
     } finally {
       setBusy(false);
     }
   };
   return (
-    <section className="action-card" aria-label={`Email ${email.subject}`}>
-      <h3>Email draft · revision {email.revision}</h3>
+    <section
+      className="action-card email-card"
+      aria-label={t("Email {0}", { 0: email.subject })}
+    >
+      <h3>
+        {t("Email draft · revision")}
+        {email.revision}
+      </h3>
       <p role="status">
-        {email.approval_status} · {email.send_status}
+        {t(email.approval_status)} · {t(email.send_status)}
         {email.error_code ? ` · ${email.error_code}` : ""}
       </p>
       {email.sent_at && (
         <p>
-          SMTP accepted: {new Date(email.sent_at).toLocaleString()} ·{" "}
-          {email.provider_message_id}
+          {t("SMTP accepted:")}
+          {formatDate(email.sent_at)} · {email.provider_message_id}
         </p>
       )}
       {email.error_code === "SMTP_DELIVERY_UNCERTAIN" && (
         <p role="alert">
-          Delivery is uncertain. Check the mailbox before taking further action.
-          Automatic resend is blocked.
+          {t(
+            "Delivery is uncertain. Check the mailbox before taking further action. Automatic resend is blocked.",
+          )}
         </p>
       )}
       <label>
-        Recipients (comma separated)
+        {t("Recipients (comma separated)")}
         <input
           value={recipients}
           disabled={locked || busy}
@@ -192,7 +217,7 @@ export function EmailEditor({
         />
       </label>
       <label>
-        Subject
+        {t("Subject")}
         <input
           value={subject}
           maxLength={300}
@@ -204,7 +229,7 @@ export function EmailEditor({
         />
       </label>
       <label>
-        Email body
+        {t("Email body")}
         <textarea
           rows={10}
           value={body}
@@ -217,15 +242,16 @@ export function EmailEditor({
         />
       </label>
       <p>
-        Recipients must be explicitly chosen from the configured allowlist.
-        Names never become inferred email addresses.
+        {t(
+          "Recipients must be explicitly chosen from the configured allowlist. Names never become inferred email addresses.",
+        )}
       </p>
       <Button
         variant="outline"
         disabled={locked || busy || !dirty}
         onClick={() => void run(false)}
       >
-        Save draft
+        {t("Save draft")}
       </Button>
       <label className="approval-check">
         <input
@@ -234,7 +260,9 @@ export function EmailEditor({
           disabled={locked || busy || dirty}
           onChange={(e) => setConfirmed(e.target.checked)}
         />
-        I approve sending this saved revision to the recipients shown above.
+        {t(
+          "I approve sending this saved revision to the recipients shown above.",
+        )}
       </label>
       <Button
         disabled={
@@ -242,10 +270,10 @@ export function EmailEditor({
         }
         onClick={() => void run(true)}
       >
-        {busy ? "Working…" : "Approve & send email"}
+        {busy ? t("Working…") : t("Approve & send email")}
       </Button>
-      {dirty && <p>Save your changes before approving.</p>}
-      {error && <p role="alert">{error}</p>}
+      {dirty && <p>{t("Save your changes before approving.")}</p>}
+      {error && <p role="alert">{t(error)}</p>}
     </section>
   );
 }
@@ -278,7 +306,7 @@ export function ActionsPanel() {
     } catch (cause) {
       if (seq.current === current)
         setError(
-          cause instanceof Error ? cause.message : "Unable to load actions.",
+          cause instanceof Error ? cause.message : t("Unable to load actions."),
         );
     } finally {
       if (seq.current === current) setLoading(false);
@@ -293,26 +321,73 @@ export function ActionsPanel() {
     };
   }, [refresh]);
   return (
-    <section className="phase3-panel" aria-label="Tasks and approved actions">
-      <p>Tasks are proposals until reviewed. Saving a draft never sends it.</p>
+    <section
+      className="phase3-panel actions-workspace"
+      aria-label={t("Tasks and approved actions")}
+    >
+      <div className="info-banner">
+        <ShieldCheck size={20} />
+        <p>{t("Human approval is required. Saving a draft never sends it.")}</p>
+      </div>
+      <Metrics
+        items={[
+          {
+            label: "Matching tasks",
+            value: loading ? null : tasks.length,
+            icon: CheckSquare,
+          },
+          {
+            label: "Email drafts",
+            value: loading
+              ? null
+              : emails.filter((e) => e.send_status !== "sent").length,
+            icon: Mail,
+          },
+          {
+            label: "SMTP accepted",
+            value: loading
+              ? null
+              : emails.filter((e) => e.send_status === "sent").length,
+            icon: CheckCircle2,
+          },
+          {
+            label: "Delivery needs attention",
+            value: loading
+              ? null
+              : emails.filter(
+                  (e) =>
+                    e.send_status === "failed" ||
+                    e.error_code === "SMTP_DELIVERY_UNCERTAIN",
+                ).length,
+            icon: AlertCircle,
+          },
+        ]}
+      />
+      <p>
+        {t(
+          "Tasks are proposals until reviewed. Saving a draft never sends it.",
+        )}
+      </p>
       <div className="action-filters">
         <label>
-          Filter status
+          {t("Filter status")}
           <select value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="">All</option>
+            <option value="">{t("All")}</option>
             {["proposed", "open", "in_progress", "done", "cancelled"].map(
               (v) => (
-                <option key={v}>{v}</option>
+                <option key={v} value={v}>
+                  {t(v)}
+                </option>
               ),
             )}
           </select>
         </label>
         <label>
-          Filter owner
+          {t("Filter owner")}
           <input value={owner} onChange={(e) => setOwner(e.target.value)} />
         </label>
         <label>
-          Due before (UTC)
+          {t("Due before (UTC)")}
           <input
             type="date"
             value={due}
@@ -320,30 +395,37 @@ export function ActionsPanel() {
           />
         </label>
       </div>
-      {loading && <p role="status">Loading actions…</p>}
+      {loading && <p role="status">{t("Loading actions…")}</p>}
       {error && (
         <div role="alert">
-          {error}
-          <Button onClick={() => void refresh()}>Retry loading</Button>
+          {t(error)}
+          <Button onClick={() => void refresh()}>{t("Retry loading")}</Button>
         </div>
       )}
-      {!loading && !tasks.length && <p>No matching tasks.</p>}
-      {tasks.map((t) => (
-        <TaskEditor
-          key={`${t.id}:${t.updated_at}`}
-          task={t}
-          onSaved={() => void refresh()}
-        />
-      ))}
-      <h2>Email drafts and delivery</h2>
-      {!loading && !emails.length && <p>No email drafts yet.</p>}
-      {emails.map((e) => (
-        <EmailEditor
-          key={`${e.id}:${e.revision}`}
-          email={e}
-          onSaved={() => void refresh()}
-        />
-      ))}
+      <div className="actions-columns">
+        <div>
+          <h2>{t("Tasks & Actions")}</h2>
+          {!loading && !tasks.length && <p>{t("No matching tasks.")}</p>}
+          {tasks.map((t) => (
+            <TaskEditor
+              key={`${t.id}:${t.updated_at}`}
+              task={t}
+              onSaved={() => void refresh()}
+            />
+          ))}
+        </div>
+        <div>
+          <h2>{t("Email drafts and delivery")}</h2>
+          {!loading && !emails.length && <p>{t("No email drafts yet.")}</p>}
+          {emails.map((e) => (
+            <EmailEditor
+              key={`${e.id}:${e.revision}`}
+              email={e}
+              onSaved={() => void refresh()}
+            />
+          ))}
+        </div>
+      </div>
     </section>
   );
 }

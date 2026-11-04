@@ -1,5 +1,14 @@
+import { t, getLanguage } from "../../i18n";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { MessageSquare, Plus, Send, Square } from "lucide-react";
+import {
+  MessageSquare,
+  Plus,
+  Send,
+  Square,
+  ShieldCheck,
+  PanelRightClose,
+  PanelRightOpen,
+} from "lucide-react";
 import type { components } from "../../types/api.generated";
 import { Button } from "../../components/ui/button";
 import { api, readEvents, responseError, type ChatEvent } from "./stream";
@@ -30,6 +39,8 @@ export function ChatPanel() {
   const [active, setActive] = useState<string | null>(selectedId);
   const current = useRef(active);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [evidenceOpen, setEvidenceOpen] = useState(true);
+  const [evidenceMessage, setEvidenceMessage] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -55,7 +66,7 @@ export function ChatPanel() {
     } catch (cause) {
       if (current.current === id)
         setError(
-          cause instanceof Error ? cause.message : "Unable to load history.",
+          cause instanceof Error ? cause.message : t("Unable to load history."),
         );
     } finally {
       if (loadingSequence.current === sequence) setLoading(false);
@@ -78,7 +89,9 @@ export function ChatPanel() {
       ]);
     } catch (cause) {
       setLoading(false);
-      setError(cause instanceof Error ? cause.message : "Unable to load chat.");
+      setError(
+        cause instanceof Error ? cause.message : t("Unable to load chat."),
+      );
     }
   }, [history, list]);
 
@@ -187,12 +200,16 @@ export function ChatPanel() {
         retryId ? `/api/messages/${retryId}/retry` : "/api/chat/stream",
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Accept-Language": getLanguage(),
+          },
           signal: controller.signal,
           body: JSON.stringify(
             retryId
-              ? { request_id: crypto.randomUUID() }
+              ? { request_id: crypto.randomUUID(), language: getLanguage() }
               : {
+                  language: getLanguage(),
                   conversation_id: active,
                   message: text,
                   request_id: crypto.randomUUID(),
@@ -206,7 +223,7 @@ export function ChatPanel() {
     } catch (cause) {
       if (!(cause instanceof DOMException && cause.name === "AbortError")) {
         setError(
-          cause instanceof Error ? cause.message : "Chat request failed.",
+          cause instanceof Error ? cause.message : t("Chat request failed."),
         );
         if (!responseId.current && !retryId) setDraft(text);
       }
@@ -226,12 +243,19 @@ export function ChatPanel() {
       if (responseId.current)
         await api(`/messages/${responseId.current}/cancel`, { method: "POST" });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Stop request failed.");
+      setError(
+        cause instanceof Error ? cause.message : t("Stop request failed."),
+      );
     } finally {
       pending.current?.abort();
     }
   };
 
+  const inspected =
+    messages.find((m) => m.id === evidenceMessage) ??
+    messages
+      .filter((m) => m.role === "assistant" && m.citations_json.length > 0)
+      .at(-1);
   const latest = messages.at(-1);
   const pendingHistory =
     !streaming && messages.some((row) => row.status === "streaming");
@@ -246,12 +270,18 @@ export function ChatPanel() {
       latest.status,
     );
   return (
-    <section className="chat-workspace" aria-label="Chat workspace">
-      <aside className="conversation-list" aria-label="Conversations">
+    <section
+      className={`chat-workspace ${evidenceOpen ? "with-evidence" : ""}`}
+      aria-label={t("Chat workspace")}
+    >
+      <aside className="conversation-list" aria-label={t("Conversations")}>
         <Button onClick={() => void choose(null)} disabled={streaming}>
-          <Plus size={15} /> New conversation
+          <Plus size={15} />
+          {t("New conversation")}
         </Button>
-        {conversations.length === 0 && <p>No saved conversations yet.</p>}
+        {conversations.length === 0 && (
+          <p>{t("No saved conversations yet.")}</p>
+        )}
         {conversations.map((row) => (
           <button
             key={row.id}
@@ -268,8 +298,27 @@ export function ChatPanel() {
         ))}
       </aside>
       <div className="chat-main">
+        <div className="chat-context-header">
+          <span>
+            <ShieldCheck size={16} />
+            {t("Source-linked answers")}
+          </span>
+          <button
+            className="icon-button"
+            type="button"
+            aria-label={t("Toggle evidence panel")}
+            aria-expanded={evidenceOpen}
+            onClick={() => setEvidenceOpen((v) => !v)}
+          >
+            {evidenceOpen ? (
+              <PanelRightClose size={18} />
+            ) : (
+              <PanelRightOpen size={18} />
+            )}
+          </button>
+        </div>
         <fieldset className="pdf-selector" disabled={streaming}>
-          <legend>PDF evidence (optional, up to 5)</legend>
+          <legend>{t("PDF evidence (optional, up to 5)")}</legend>
           {documents
             .filter((row) => row.status === "ready")
             .map((row) => (
@@ -289,58 +338,68 @@ export function ChatPanel() {
               </label>
             ))}
           {!documents.some((row) => row.status === "ready") && (
-            <small>No ready PDFs. Upload and index in Knowledge Base.</small>
+            <small>
+              {t("No ready PDFs. Upload and index in Knowledge Base.")}
+            </small>
           )}
           {documentIds.length > 0 && !embeddingReady && (
-            <p>Configure backend Embedding credentials before querying PDFs.</p>
+            <p>
+              {t(
+                "Configure backend Embedding credentials before querying PDFs.",
+              )}
+            </p>
           )}
         </fieldset>
         {activity && (
           <p role="status" className="tool-activity">
-            {activity}
+            {t(activity)}
           </p>
         )}
         {config && !config.configured && (
           <div className="configuration-notice" role="status">
-            <strong>Chat configuration required / 请配置模型</strong>
-            <p>{config.message}</p>
+            <strong>{t("Chat configuration required / 请配置模型")}</strong>
+            <p>{t(config.message)}</p>
             <p>
-              在后端项目根目录的 .env 填写 LLM_API_KEY、LLM_MODEL 和
-              LLM_BASE_URL，然后重启 API。不会生成模拟回答。
+              {t(
+                "在后端项目根目录的 .env 填写 LLM_API_KEY、LLM_MODEL 和 LLM_BASE_URL，然后重启 API。不会生成模拟回答。",
+              )}
             </p>
             <Button variant="outline" onClick={() => void initialize()}>
-              Recheck configuration
+              {t("Recheck configuration")}
             </Button>
           </div>
         )}
         {error && (
           <div role="alert" className="health-error">
-            <p>{error}</p>
+            <p>{t(error)}</p>
             <Button
               variant="outline"
               onClick={() => void initialize()}
               disabled={streaming}
             >
-              Reload chat
+              {t("Reload chat")}
             </Button>
           </div>
         )}
         <div
           className="chat-messages"
-          aria-label="Message history"
+          aria-label={t("Message history")}
           aria-busy={loading}
         >
-          {loading && <p>Loading conversation…</p>}
+          {loading && <p>{t("Loading conversation…")}</p>}
           {!loading && messages.length === 0 && (
             <div className="chat-empty">
               <MessageSquare size={30} />
-              <h2>Start a conversation</h2>
+              <h2>{t("Start a conversation")}</h2>
               <p>
-                Ask a question. Conversations are saved locally in Postgres.
+                {t(
+                  "Ask a question. Conversations are saved locally in Postgres.",
+                )}
               </p>
               <small>
-                Select ready PDFs below for grounded answers. Web tools remain
-                unavailable.
+                {t(
+                  "Select ready PDFs for grounded answers, or use /search for web research.",
+                )}
               </small>
             </div>
           )}
@@ -348,24 +407,40 @@ export function ChatPanel() {
             <article
               className={`chat-message ${message.role}`}
               key={message.id}
-              aria-label={`${message.role} message`}
+              aria-label={t("{0} message", { 0: t(message.role) })}
             >
-              <strong>{message.role === "user" ? "You" : "Memora"}</strong>
+              <strong>
+                {message.role === "user" ? t("You") : t("Memora")}
+              </strong>
               <div className="message-content">
                 {message.content ||
                   (message.status === "streaming"
-                    ? "Waiting for model…"
-                    : "No answer was generated.")}
+                    ? t("Waiting for model…")
+                    : t("No answer was generated."))}
               </div>
               {message.status !== "complete" && (
                 <small className="message-status">
-                  {message.status}
+                  {t(message.status)}
                   {message.error_code ? ` · ${message.error_code}` : ""}
                 </small>
               )}
               <CitationCards
                 sources={message.citations_json as unknown as Citation[]}
               />
+              {message.citations_json.length > 0 && (
+                <button
+                  className="inspect-button"
+                  type="button"
+                  aria-pressed={inspected?.id === message.id}
+                  onClick={() => {
+                    setEvidenceMessage(message.id);
+                    setEvidenceOpen(true);
+                  }}
+                >
+                  <ShieldCheck size={14} />
+                  {t("Inspect these sources")}
+                </button>
+              )}
             </article>
           ))}
           <div ref={end} />
@@ -376,7 +451,7 @@ export function ChatPanel() {
             onClick={() => void send(latest.id)}
             disabled={!config?.configured}
           >
-            Retry last response
+            {t("Retry last response")}
           </Button>
         )}
         <form
@@ -386,10 +461,10 @@ export function ChatPanel() {
             void send();
           }}
         >
-          <label htmlFor="chat-message">Message</label>
+          <label htmlFor="chat-message">{t("Message")}</label>
           <textarea
             id="chat-message"
-            placeholder="Ask Memora…"
+            placeholder={t("Ask Memora…")}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             maxLength={4000}
@@ -399,8 +474,11 @@ export function ChatPanel() {
           <div>
             <small>
               {config?.configured
-                ? `Model: ${config.model}. Messages are sent to your configured provider.`
-                : "Add backend credentials to enable chat."}
+                ? t(
+                    "Model: {0}. Messages are sent to your configured provider.",
+                    { 0: config.model },
+                  )
+                : t("Add backend credentials to enable chat.")}
             </small>
             {streaming ? (
               <Button
@@ -408,7 +486,8 @@ export function ChatPanel() {
                 variant="outline"
                 onClick={() => void stop()}
               >
-                <Square size={14} /> Stop response
+                <Square size={14} />
+                {t("Stop response")}
               </Button>
             ) : (
               <Button
@@ -420,12 +499,43 @@ export function ChatPanel() {
                   (documentIds.length > 0 && !embeddingReady)
                 }
               >
-                <Send size={14} /> Send
+                <Send size={14} />
+                {t("Send")}
               </Button>
             )}
           </div>
         </form>
       </div>
+      {evidenceOpen && (
+        <aside
+          className="evidence-inspector"
+          aria-label={t("Evidence inspector")}
+        >
+          <h2>
+            <ShieldCheck size={18} />
+            {t("Evidence inspector")}
+          </h2>
+          <p className="inspector-caption">
+            {t(
+              "Original sources for the selected or most recent sourced answer. Open a reference to inspect the evidence.",
+            )}
+          </p>
+          {inspected?.citations_json.length ? (
+            <CitationCards
+              sources={inspected.citations_json as unknown as Citation[]}
+            />
+          ) : (
+            <div className="inspector-empty">
+              <ShieldCheck size={28} />
+              <p>
+                {t(
+                  "Sources will appear here when an answer includes evidence.",
+                )}
+              </p>
+            </div>
+          )}
+        </aside>
+      )}
     </section>
   );
 }

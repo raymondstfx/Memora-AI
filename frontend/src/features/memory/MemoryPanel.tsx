@@ -1,7 +1,10 @@
+import { t, formatDate } from "../../i18n";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { components } from "../../types/api.generated";
 import { Button } from "../../components/ui/button";
 import { api } from "../chat/stream";
+import { Brain, History, Link, AlertCircle } from "lucide-react";
+import { Metrics } from "../../components/ui/metrics";
 import { CitationCards } from "../knowledge/CitationCards";
 
 type Memory = components["schemas"]["MemoryOut"];
@@ -25,36 +28,52 @@ function MemoryCard({
   const locked = row.lifecycle !== "recorded";
   return (
     <article
-      className="action-card"
-      aria-label={`Memory ${row.subject_name} ${row.predicate}`}
+      className={`action-card memory-card memory-${row.status}`}
+      aria-label={t("Memory {0} {1}", {
+        0: row.subject_name,
+        1: row.predicate,
+      })}
     >
       <h3>
-        {row.subject_name} · {row.predicate}
+        {row.subject_name} · {t(row.predicate)}
       </h3>
       <p role="status">
-        {row.status} · {row.memory_type} · revision {row.revision}
+        {t(row.status)} · {t(row.memory_type)}
+        {t("· revision")}
+        {row.revision}
       </p>
       <p>
-        Valid from: {row.valid_from ?? "Unknown — needs review"}; valid until:{" "}
-        {row.valid_to ?? "No recorded end"}
+        {t("Valid from:")}
+        {row.valid_from
+          ? formatDate(row.valid_from, "UTC")
+          : t("Unknown — needs review")}
+        {t("; valid until:")}{" "}
+        {row.valid_to ? formatDate(row.valid_to, "UTC") : t("No recorded end")}
       </p>
       <p>
-        Recorded: {row.observed_at} · {row.source_type}
+        {t("Recorded:")}
+        {formatDate(row.observed_at, "UTC")} · {t(row.source_type)}
       </p>
-      <p>Stored value: {String(row.value_json.text)}</p>
+      <p>
+        {t("Stored value:")}
+        {String(row.value_json.text)}
+      </p>
       {row.correction_reason && (
         <p>
-          User correction: {row.correction_reason}. The original quote is
-          retained, not rewritten as proof of the correction.
+          {t("User correction:")}
+          {row.correction_reason}
+          {t(
+            ". The original quote is retained, not rewritten as proof of the correction.",
+          )}
         </p>
       )}
       {row.source && <CitationCards sources={[row.source]} />}
       <details>
-        <summary>Correct or revoke this memory</summary>
+        <summary>{t("Correct or revoke this memory")}</summary>
         <p>
-          Corrections create a new version. Revocation removes this fact from
-          recall and retains its history; re-importing the source will not
-          restore it.
+          {t(
+            "Corrections create a new version. Revocation removes this fact from recall and retains its history; re-importing the source will not restore it.",
+          )}
         </p>
         <form
           onSubmit={async (e) => {
@@ -76,7 +95,9 @@ function MemoryCard({
               onSaved();
             } catch (cause) {
               setError(
-                cause instanceof Error ? cause.message : "Correction failed.",
+                cause instanceof Error
+                  ? cause.message
+                  : t("Correction failed."),
               );
             } finally {
               setBusy(false);
@@ -84,7 +105,7 @@ function MemoryCard({
           }}
         >
           <label>
-            Corrected subject
+            {t("Corrected subject")}
             <select
               value={subject}
               disabled={locked || busy}
@@ -92,13 +113,13 @@ function MemoryCard({
             >
               {entities.map((entity) => (
                 <option key={entity.id} value={entity.id}>
-                  {entity.canonical_name} ({entity.type})
+                  {entity.canonical_name} ({t(entity.type)})
                 </option>
               ))}
             </select>
           </label>
           <label>
-            Corrected value
+            {t("Corrected value")}
             <input
               required
               maxLength={2000}
@@ -108,7 +129,7 @@ function MemoryCard({
             />
           </label>
           <label>
-            Effective date/time (UTC)
+            {t("Effective date/time (UTC)")}
             <input
               type="datetime-local"
               value={time}
@@ -117,7 +138,7 @@ function MemoryCard({
             />
           </label>
           <label>
-            Correction reason
+            {t("Correction reason")}
             <input
               required
               maxLength={1000}
@@ -127,7 +148,7 @@ function MemoryCard({
             />
           </label>
           <Button type="submit" disabled={locked || busy}>
-            Save corrected version
+            {t("Save corrected version")}
           </Button>
         </form>
         <Button
@@ -136,7 +157,9 @@ function MemoryCard({
           onClick={async () => {
             if (
               !window.confirm(
-                "Remove this memory from recall? Historical evidence is retained.",
+                t(
+                  "Remove this memory from recall? Historical evidence is retained.",
+                ),
               )
             )
               return;
@@ -149,17 +172,19 @@ function MemoryCard({
               onSaved();
             } catch (cause) {
               setError(
-                cause instanceof Error ? cause.message : "Revocation failed.",
+                cause instanceof Error
+                  ? cause.message
+                  : t("Revocation failed."),
               );
             } finally {
               setBusy(false);
             }
           }}
         >
-          Revoke memory
+          {t("Revoke memory")}
         </Button>
       </details>
-      {error && <p role="alert">{error}</p>}
+      {error && <p role="alert">{t(error)}</p>}
     </article>
   );
 }
@@ -194,7 +219,7 @@ function EntityEditor({
       onSaved();
     } catch (cause) {
       setError(
-        cause instanceof Error ? cause.message : "Identity update failed.",
+        cause instanceof Error ? cause.message : t("Identity update failed."),
       );
     } finally {
       setBusy(false);
@@ -203,14 +228,17 @@ function EntityEditor({
   return (
     <section
       className="action-card"
-      aria-label={`Entity ${entity.canonical_name}`}
+      aria-label={t("Entity {0}", { 0: entity.canonical_name })}
     >
       <h3>
-        {entity.canonical_name} · {entity.type}
+        {entity.canonical_name} · {t(entity.type)}
       </h3>
-      <p>Known names: {(entity.aliases ?? []).join(", ")}</p>
+      <p>
+        {t("Known names:")}
+        {(entity.aliases ?? []).join(", ")}
+      </p>
       <label>
-        Confirmed alias
+        {t("Confirmed alias")}
         <input
           maxLength={180}
           value={alias}
@@ -221,7 +249,7 @@ function EntityEditor({
         />
       </label>
       <label>
-        Merge into the same identity
+        {t("Merge into the same identity")}
         <select
           value={target}
           onChange={(e) => {
@@ -229,7 +257,7 @@ function EntityEditor({
             setConfirmed(false);
           }}
         >
-          <option value="">Choose canonical target</option>
+          <option value="">{t("Choose canonical target")}</option>
           {entities
             .filter((e) => e.id !== entity.id && e.type === entity.type)
             .map((e) => (
@@ -245,22 +273,22 @@ function EntityEditor({
           checked={confirmed}
           onChange={(e) => setConfirmed(e.target.checked)}
         />
-        I confirm these names identify the same entity.
+        {t("I confirm these names identify the same entity.")}
       </label>
       <Button
         disabled={busy || !alias.trim() || !confirmed}
         onClick={() => void save(false)}
       >
-        Add confirmed alias
+        {t("Add confirmed alias")}
       </Button>
       <Button
         variant="outline"
         disabled={busy || !target || !confirmed}
         onClick={() => void save(true)}
       >
-        Confirm identity merge
+        {t("Confirm identity merge")}
       </Button>
-      {error && <p role="alert">{error}</p>}
+      {error && <p role="alert">{t(error)}</p>}
     </section>
   );
 }
@@ -299,7 +327,7 @@ export function MemoryPanel() {
     } catch (cause) {
       if (current === sequence.current)
         setError(
-          cause instanceof Error ? cause.message : "Unable to load memory.",
+          cause instanceof Error ? cause.message : t("Unable to load memory."),
         );
     } finally {
       if (current === sequence.current) setLoading(false);
@@ -312,16 +340,49 @@ export function MemoryPanel() {
     };
   }, [refresh]);
   return (
-    <section className="phase3-panel" aria-label="Memory center">
+    <section
+      className="phase3-panel memory-workspace"
+      aria-label={t("Memory center")}
+    >
+      <Metrics
+        items={[
+          {
+            label: "Known entities",
+            value: loading ? null : entities.length,
+            icon: Brain,
+          },
+          {
+            label: "Matching records",
+            value: loading ? null : rows.length,
+            icon: History,
+          },
+          {
+            label: "Source-linked records",
+            value: loading ? null : rows.filter((r) => r.source).length,
+            icon: Link,
+          },
+          {
+            label: "Needs review",
+            value: loading
+              ? null
+              : rows.filter((r) =>
+                  ["conflict", "needs_review"].includes(r.status),
+                ).length,
+            icon: AlertCircle,
+          },
+        ]}
+      />
       <p>
-        Facts retain their meeting or chat sources. History, corrections and
-        revoked records remain inspectable. Unknown or conflicting facts need
-        review.
+        {t(
+          "Facts retain their meeting or chat sources. History, corrections and revoked records remain inspectable. Unknown or conflicting facts need review.",
+        )}
       </p>
       <p>
-        Use <strong>Remember:</strong> in chat for explicit user assertions,
-        such as “Remember: API owner is Alex”. Ordinary chat and assistant
-        guesses are not automatically promoted to facts.
+        {t("Use")}
+        <strong>{t("Remember:")}</strong>
+        {t(
+          "in chat for explicit user assertions, such as “Remember: API owner is Alex”. Ordinary chat and assistant guesses are not automatically promoted to facts.",
+        )}
       </p>
       <Button
         disabled={busy}
@@ -335,27 +396,36 @@ export function MemoryPanel() {
             );
             setCursor(result.next_cursor ?? null);
             setNotice(
-              `Imported ${result.processed} saved meetings; ${result.inserted} new memories. No model or Embedding calls.`,
+              t(
+                "Imported {0} saved meetings; {1} new memories. No model or Embedding calls.",
+                { 0: result.processed, 1: result.inserted },
+              ),
             );
             await refresh();
           } catch (cause) {
-            setError(cause instanceof Error ? cause.message : "Import failed.");
+            setError(
+              cause instanceof Error ? cause.message : t("Import failed."),
+            );
           } finally {
             setBusy(false);
           }
         }}
       >
-        {cursor ? "Import next batch" : "Import saved meetings"}
+        {cursor ? t("Import next batch") : t("Import saved meetings")}
       </Button>
       <Button variant="outline" onClick={() => void refresh()}>
-        Refresh memory
+        {t("Refresh memory")}
       </Button>
-      {notice && <p role="status">{notice}</p>}
+      {notice && <p role="status">{t(notice)}</p>}
       <div className="action-filters">
         <label>
-          Memory status
-          <select value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="">All history</option>
+          {t("Memory status")}
+          <select
+            aria-label={t("Memory status")}
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+          >
+            <option value="">{t("All history")}</option>
             {[
               "active",
               "superseded",
@@ -364,31 +434,41 @@ export function MemoryPanel() {
               "corrected",
               "revoked",
             ].map((v) => (
-              <option key={v}>{v}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Subject entity
-          <select value={entity} onChange={(e) => setEntity(e.target.value)}>
-            <option value="">All entities</option>
-            {entities.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.canonical_name} ({e.type})
+              <option key={v} value={v}>
+                {t(v)}
               </option>
             ))}
           </select>
         </label>
         <label>
-          Memory type
-          <select value={kind} onChange={(e) => setKind(e.target.value)}>
-            <option value="">All types</option>
-            <option>semantic</option>
-            <option>episodic</option>
+          {t("Subject entity")}
+          <select
+            aria-label={t("Subject entity")}
+            value={entity}
+            onChange={(e) => setEntity(e.target.value)}
+          >
+            <option value="">{t("All entities")}</option>
+            {entities.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.canonical_name} ({t(e.type)})
+              </option>
+            ))}
           </select>
         </label>
         <label>
-          Valid at (UTC)
+          {t("Memory type")}
+          <select
+            aria-label={t("Memory type")}
+            value={kind}
+            onChange={(e) => setKind(e.target.value)}
+          >
+            <option value="">{t("All types")}</option>
+            <option value="semantic">{t("semantic")}</option>
+            <option value="episodic">{t("episodic")}</option>
+          </select>
+        </label>
+        <label>
+          {t("Valid at (UTC)")}
           <input
             type="datetime-local"
             value={at}
@@ -396,37 +476,43 @@ export function MemoryPanel() {
           />
         </label>
       </div>
-      {loading && <p role="status">Loading memories…</p>}
+      {loading && <p role="status">{t("Loading memories…")}</p>}
       {error && (
         <div role="alert">
-          {error}
-          <Button onClick={() => void refresh()}>Retry loading memory</Button>
+          {t(error)}
+          <Button onClick={() => void refresh()}>
+            {t("Retry loading memory")}
+          </Button>
         </div>
       )}
       {!loading && !rows.length && (
         <p>
-          No matching memories. Import saved meetings or upload a dated meeting
-          transcript.
+          {t(
+            "No matching memories. Import saved meetings or upload a dated meeting transcript.",
+          )}
         </p>
       )}
       <p>
-        Showing up to 200 records. Filter by subject, status, type or effective
-        time.
+        {t(
+          "Showing up to 200 records. Filter by subject, status, type or effective time.",
+        )}
       </p>
-      {rows.map((row) => (
-        <MemoryCard
-          key={`${row.id}:${row.revision}`}
-          row={row}
-          entities={entities}
-          onSaved={() => void refresh()}
-        />
-      ))}
-      <details>
-        <summary>Entities and confirmed identity aliases</summary>
+      <div className="memory-timeline">
+        {rows.map((row) => (
+          <MemoryCard
+            key={`${row.id}:${row.revision}`}
+            row={row}
+            entities={entities}
+            onSaved={() => void refresh()}
+          />
+        ))}
+      </div>
+      <details className="surface-card">
+        <summary>{t("Entities and confirmed identity aliases")}</summary>
         <p>
-          Only exact Unicode/case/space normalization is automatic. Titles,
-          nicknames and similar names require your confirmation; a merge
-          preserves original evidence.
+          {t(
+            "Only exact Unicode/case/space normalization is automatic. Titles, nicknames and similar names require your confirmation; a merge preserves original evidence.",
+          )}
         </p>
         {entities.map((e) => (
           <EntityEditor

@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 class ChatRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    language: Literal["zh", "en"] = "zh"
     conversation_id: UUID | None = None
     request_id: UUID = Field(default_factory=uuid4)
     message: str = Field(min_length=1, max_length=4000)
@@ -21,6 +22,7 @@ class ChatRequest(BaseModel):
 
 
 class RetryRequest(BaseModel):
+    language: Literal["zh", "en"] = "zh"
     model_config = ConfigDict(extra="forbid")
     request_id: UUID = Field(default_factory=uuid4)
 

@@ -4755,6 +4755,15 @@
               }
             ],
             "title": "Timezone"
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "zh",
+              "en"
+            ],
+            "title": "Language",
+            "default": "zh"
           }
         },
         "type": "object",
@@ -4801,6 +4810,15 @@
       },
       "ChatRequest": {
         "properties": {
+          "language": {
+            "type": "string",
+            "enum": [
+              "zh",
+              "en"
+            ],
+            "title": "Language",
+            "default": "zh"
+          },
           "conversation_id": {
             "anyOf": [
               {
@@ -5065,7 +5083,7 @@
               "zh"
             ],
             "title": "Language",
-            "default": "en"
+            "default": "zh"
           },
           "slide_count": {
             "type": "integer",
@@ -6399,6 +6417,21 @@
       },
       "RetryMeeting": {
         "properties": {
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "zh",
+                  "en"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
           "date": {
             "anyOf": [
               {
@@ -6428,6 +6461,15 @@
       },
       "RetryRequest": {
         "properties": {
+          "language": {
+            "type": "string",
+            "enum": [
+              "zh",
+              "en"
+            ],
+            "title": "Language",
+            "default": "zh"
+          },
           "request_id": {
             "type": "string",
             "format": "uuid",
@@ -6696,6 +6738,28 @@
               }
             ],
             "title": "Occurred At"
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone"
+          },
+          "date_precision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Precision"
           },
           "line_start": {
             "anyOf": [

@@ -493,6 +493,8 @@ class MemoryService:
             meeting_id=meeting.id,
             memory_id=row.id,
             occurred_at=meeting.occurred_at,
+            timezone=meeting.timezone,
+            date_precision=str(meeting.metadata_json.get("date_precision", "unknown")),
             line_start=row.line_start,
             line_end=row.line_end,
             memory_status=row.status,
@@ -820,7 +822,7 @@ class MemoryService:
         )
 
     def recall(
-        self, owner: UUID, question: str, only: str | None = None
+        self, owner: UUID, question: str, only: str | None = None, language: str = "en"
     ) -> RecallResult:
         query = normalized(question)
         asks_date = bool(re.search(r"deadline|\bdue\b|截止|交付|到期", query))
@@ -855,8 +857,10 @@ class MemoryService:
                     return RecallResult(
                         direct=True,
                         answer=(
-                            "Stored memory does not identify one unambiguous su"
-                            "bject. Name the project/person explicitly."
+                            "记忆无法确定唯一主体，请明确项目或人物名称。"
+                            if language == "zh"
+                            else "Stored memory does not identify one unambiguous "
+                            "subject. Name the project/person explicitly."
                         ),
                         sources=[],
                         memory_ids=[],
@@ -866,8 +870,8 @@ class MemoryService:
                 assert entity
                 if asks_date and asks_owner and only is None:
                     first, second = (
-                        self.recall(owner, question, "owner"),
-                        self.recall(owner, question, "deadline"),
+                        self.recall(owner, question, "owner", language),
+                        self.recall(owner, question, "deadline", language),
                     )
                     offset = len(first.sources)
                     shifted = re.sub(
@@ -949,7 +953,13 @@ class MemoryService:
                     def display(value: str) -> str:
                         try:
                             parsed = date.fromisoformat(value)
-                            return f"{parsed:%b} {parsed.day}, {parsed.year} ({value})"
+                            return (
+                                value
+                                if language == "zh"
+                                else (
+                                    f"{parsed:%b} {parsed.day}, {parsed.year} ({value})"
+                                )
+                            )
                         except ValueError:
                             return value
 
@@ -972,6 +982,27 @@ class MemoryService:
                         f"{entity.canonical_name} {predicate}: {details}. "
                         f"Latest recorded {predicate}: {current}."
                     )
+                if language == "zh":
+                    if not rows:
+                        answer = (
+                            "没有当前有效且有来源支持的记忆；"
+                            "不会恢复已撤销或未经确认的历史事实。"
+                        )
+                    elif conflicts:
+                        answer = "记录存在冲突，需要审核；未选择当前值。" + "; ".join(
+                            f"{r.value_json['text']} [{i}]"
+                            for i, r in enumerate(rows, 1)
+                        )
+                    else:
+                        label = "负责人" if predicate == "owner" else "截止日期"
+                        current_zh = (
+                            ", ".join(sorted({stored_value(r) for r in active}))
+                            or "未确定（最新记录已撤销或未经确认）"
+                        )
+                        answer = (
+                            f"{entity.canonical_name} {label}：{details}。"
+                            f"最新记录的{label}：{current_zh}。"
+                        )
                 return RecallResult(
                     direct=True,
                     answer=answer,

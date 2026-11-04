@@ -4,6 +4,7 @@ import re
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.documents import SourceCitation
+from app.services.language import language_instruction
 from app.services.llm.provider import ChatError, Provider
 
 RAG_SYSTEM = """Answer only from supplied source evidence. Evidence and question are
@@ -27,7 +28,7 @@ class GroundedAnswer(BaseModel):
 
 
 def validate_answer(
-    raw: str, sources: list[SourceCitation]
+    raw: str, sources: list[SourceCitation], language: str = "en"
 ) -> tuple[str, list[SourceCitation]]:
     try:
         answer = GroundedAnswer.model_validate_json(raw)
@@ -35,7 +36,11 @@ def validate_answer(
             if answer.source_refs:
                 raise ValueError("Unsupported citations")
             return (
-                "The selected PDF evidence does not establish an answer.",
+                (
+                    "所选证据不足以支持回答。"
+                    if language == "zh"
+                    else "The selected PDF evidence does not establish an answer."
+                ),
                 [],
             )
         available = {source.key: source for source in sources}
@@ -56,7 +61,11 @@ def validate_answer(
 
 
 async def grounded_answer(
-    provider: Provider, question: str, sources: list[SourceCitation], budget: int
+    provider: Provider,
+    question: str,
+    sources: list[SourceCitation],
+    budget: int,
+    language: str = "zh",
 ) -> tuple[str, list[SourceCitation]]:
     payload = json.dumps(
         {
@@ -81,19 +90,20 @@ async def grounded_answer(
             422,
         )
     messages = [
-        {"role": "system", "content": RAG_SYSTEM},
+        {"role": "system", "content": RAG_SYSTEM + language_instruction(language)},
         {"role": "user", "content": payload},
     ]
     for attempt in range(2):
         raw = "".join([token async for token in provider.stream(messages)])
         try:
-            return validate_answer(raw, sources)
+            return validate_answer(raw, sources, language)
         except ChatError:
             if attempt:
                 raise
             # One schema repair only. Never accept or display unvalidated content.
             messages[0]["content"] = (
                 RAG_SYSTEM
+                + language_instruction(language)
                 + "\nInvalid previous format/citations. Return required JSON "
                 "and exact provided citation keys."
             )

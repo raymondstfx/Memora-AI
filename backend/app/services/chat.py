@@ -20,6 +20,7 @@ from app.db.session import session_factory
 from app.schemas.chat import ChatRequest, ConversationOut, MessageOut, StreamEvent
 from app.schemas.documents import SourceCitation
 from app.services.documents import DocumentService
+from app.services.language import language_instruction, response_language
 from app.services.llm.provider import ChatError, Provider, configuration
 from app.services.memories import MemoryService
 from app.services.rag import grounded_answer
@@ -87,6 +88,7 @@ class Turn:
     document_ids: list[UUID] = field(default_factory=list)
     sources: list[SourceCitation] = field(default_factory=list)
     tool_calls: list[dict[str, object]] = field(default_factory=list)
+    language: str = "zh"
 
 
 class ChatService:
@@ -167,6 +169,7 @@ class ChatService:
         body: ChatRequest | None,
         request_id: UUID,
         retry_id: UUID | None = None,
+        retry_language: str = "zh",
     ) -> Turn:
         self.ensure_configured()
         if (
@@ -330,7 +333,18 @@ class ChatService:
                 self.settings.llm_context_token_budget,
             )
             conversation.summary, conversation.summary_position = summary, position
-            return Turn(user_id, conversation.id, assistant.id, prompt, document_ids)
+            language = response_language(
+                prompt[-1]["content"], body.language if body else retry_language
+            )
+            prompt[0]["content"] += language_instruction(language)
+            return Turn(
+                user_id,
+                conversation.id,
+                assistant.id,
+                prompt,
+                document_ids,
+                language=language,
+            )
 
     def save(
         self,
@@ -553,6 +567,7 @@ class ChatService:
                 turn.prompt[-1]["content"],
                 sources,
                 self.settings.llm_context_token_budget,
+                turn.language,
             )
         # Cite only evidence accepted by validation, never unverified model IDs.
         for source in turn.sources:
@@ -575,7 +590,11 @@ class ChatService:
             self.memories.ingest_chat, turn.user_id, turn.message_id
         )
         result = await asyncio.to_thread(
-            self.memories.recall, turn.user_id, turn.prompt[-1]["content"]
+            self.memories.recall,
+            turn.user_id,
+            turn.prompt[-1]["content"],
+            None,
+            turn.language,
         )
         if not result.direct and not result.sources:
             async for token in stream_graph(
@@ -635,6 +654,7 @@ class ChatService:
                 turn.prompt[-1]["content"],
                 result.sources,
                 self.settings.llm_context_token_budget,
+                turn.language,
             )
         for source in turn.sources:
             await queue.put(
@@ -729,6 +749,7 @@ class ChatService:
                 query,
                 sources,
                 self.settings.llm_context_token_budget,
+                turn.language,
             )
         for source in turn.sources:
             await queue.put(

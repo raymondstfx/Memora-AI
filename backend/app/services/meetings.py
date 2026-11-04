@@ -4,8 +4,10 @@ import json
 import re
 from datetime import datetime
 from uuid import UUID, uuid4
+from zoneinfo import ZoneInfo
 
 import httpx
+from pydantic import ValidationError
 from rq import Queue
 from rq.job import Callback
 from rq.serializers import JSONSerializer
@@ -43,6 +45,7 @@ from app.services.llm.provider import ChatError, OpenAICompatibleProvider, Provi
 from app.services.memories import MemoryService
 from app.services.storage import safe_filename
 from app.services.transcripts import (
+    locate_evidence,
     metadata,
     normalize_due,
     parse_txt,
@@ -62,6 +65,17 @@ including candidate_facts and memory_claims. Memory claims are atomic source-sup
 subject/predicate/value facts; distinguish project owner and deadline, preserve exact
 source values and evidence, and never infer aliases from similar names. No Markdown
 or extra keys. Model confidence is descriptive.
+Evidence quotes MUST include the exact speaker prefix when names are used, e.g.
+Alex: The API delivery deadline is now 2026-11-08.
+For this quote a deadline memory has subject="API", subject_type="project",
+predicate="deadline", value="2026-11-08"; all are literal source substrings.
+Do not use translated role/owner/due_text/memory subject/value in evidence fields.
+Translate only summary/topics/claim prose/risk rationale/mitigation/task titles.
+Every evidence.kind must be explicit_fact, inference or unknown, never fact.
+For a short transcript keep output concise: at most 2 risks, 4 tasks, 4 candidate
+facts and 4 atomic memory claims. Prioritize explicit API owner/deadline, changed
+deadline and unchanged milestones. Use source-local calendar dates, not UTC day.
+Never infer a participant's job from what they discuss. Use role=null if unknown.
 """
 
 
@@ -115,6 +129,7 @@ class MeetingService:
         data: bytes,
         date_hint: str | None,
         zone_hint: str | None,
+        language: str = "zh",
     ) -> MeetingUpload:
         if not filename.lower().endswith(".txt") or mime.split(";")[0] not in (
             "text/plain",
@@ -190,6 +205,7 @@ class MeetingService:
                             "needs_review": not occurred or not zone,
                             "source": "user_or_transcript_metadata",
                             "date_precision": date_precision(text, date_hint),
+                            "language": language,
                         },
                     )
                 )
@@ -268,6 +284,7 @@ class MeetingService:
         identifier: UUID,
         date_hint: str | None,
         zone_hint: str | None,
+        language: str | None = None,
     ) -> MeetingUpload:
         with self.sessions.begin() as db:
             db.scalar(select(User).where(User.id == owner).with_for_update())
@@ -286,10 +303,13 @@ class MeetingService:
                 occurred, zone, _, _ = metadata(text, date_hint, zone_hint)
                 meeting.occurred_at, meeting.timezone = occurred, zone
                 meeting.metadata_json = {
+                    **meeting.metadata_json,
                     "needs_review": not occurred or not zone,
                     "source": "user_or_transcript_metadata",
                     "date_precision": date_precision(text, date_hint),
                 }
+            if language is not None:
+                meeting.metadata_json = {**meeting.metadata_json, "language": language}
             self.documents.admit(db, owner)
             job_id = uuid4()
             db.add(
@@ -311,12 +331,20 @@ class MeetingService:
         return MeetingUpload(meeting_id=identifier, job_id=job_id, duplicate=False)
 
     async def extract(
-        self, lines: list[TranscriptLine], occurred: datetime | None, zone: str | None
+        self,
+        lines: list[TranscriptLine],
+        occurred: datetime | None,
+        zone: str | None,
+        language: str = "zh",
     ) -> MeetingExtraction:
         messages = [
             {
                 "role": "system",
-                "content": SYSTEM + json.dumps(MeetingExtraction.model_json_schema()),
+                "content": SYSTEM
+                + "\nOutput prose language: "
+                + language
+                + "\n"
+                + json.dumps(MeetingExtraction.model_json_schema()),
             },
             {
                 "role": "user",
@@ -324,6 +352,13 @@ class MeetingService:
                     {
                         "meeting_date": occurred.isoformat() if occurred else None,
                         "timezone": zone,
+                        "meeting_local_date": occurred.astimezone(
+                            ZoneInfo(zone or "UTC")
+                        )
+                        .date()
+                        .isoformat()
+                        if occurred
+                        else None,
                         "lines": [v.model_dump() for v in lines],
                     },
                     ensure_ascii=False,
@@ -348,21 +383,32 @@ class MeetingService:
                 raw = "".join([token async for token in provider.stream(messages)])
                 try:
                     analysis = MeetingExtraction.model_validate_json(raw)
+                    locate_evidence(analysis, lines)
                     validate_evidence(analysis, lines)
                     return analysis
                 except ValueError as exc:
+                    # Paths/types only; never include input, quote or raw output.
+                    diagnostic = (
+                        "; ".join(
+                            ".".join(map(str, e["loc"])) + ":" + e["type"]
+                            for e in exc.errors(include_input=False)[:8]
+                        )
+                        if isinstance(exc, ValidationError)
+                        else str(exc)
+                    )
                     if attempt == self.settings.meeting_repair_attempts:
                         raise ChatError(
                             "MEETING_INVALID_ANALYSIS",
                             (
                                 "Model JSON/evidence validation failed. No business r"
-                                "ecords were committed."
+                                "ecords were committed. Validation: " + diagnostic
                             ),
                         ) from exc
                     messages[0]["content"] += (
                         "\nPrevious structure/evidence invalid. Use exact quot"
-                        "es and correct line offsets; return schema JSON only"
-                        "."
+                        "es and correct line offsets; return schema JSON only. "
+                        + diagnostic
+                        + "."
                     )
             raise AssertionError("Unreachable")
 
@@ -406,6 +452,7 @@ class MeetingService:
                     meeting.occurred_at,
                     meeting.timezone,
                 )
+                language = str(meeting.metadata_json.get("language", "en"))
                 checksum = doc.checksum
                 cache_key = "memora:meeting:analysis:" + digest(
                     owner,
@@ -415,7 +462,8 @@ class MeetingService:
                     self.settings.llm_base_url,
                     self.settings.llm_model,
                     self.settings.llm_reasoning_effort,
-                    "schema-v1",
+                    "schema-v2-exact-locator",
+                    language,
                 )
             data = self.storage.path(key).read_bytes()
             if hashlib.sha256(data).hexdigest() != checksum:
@@ -431,7 +479,7 @@ class MeetingService:
             else:
                 analysis = asyncio.run(
                     asyncio.wait_for(
-                        self.extract(lines, occurred, zone),
+                        self.extract(lines, occurred, zone, language),
                         self.settings.llm_total_timeout_seconds,
                     )
                 )
@@ -569,11 +617,34 @@ class MeetingService:
                             if t.risk_id == risk.id
                         )
                     )
+                    if language == "zh":
+                        body = (
+                            f"会议：{meeting.title}\n"
+                            f"风险：{risk.title} ({risk.severity})\n"
+                            f"原因：{risk.rationale}\n"
+                            f"证据 L{risk.evidence_json['line_start']}-"
+                            f"{risk.evidence_json['line_end']}："
+                            f"{risk.evidence_json['quote']}\n"
+                            f"缓解建议：{risk.mitigation}\n待审核任务：\n"
+                            + "\n".join(
+                                f"- {t.title}；负责人：{t.owner_name or '未知'}；"
+                                f"截止：{t.due_text or '未知'}"
+                                for t in tasks
+                                if t.risk_id == risk.id
+                            )
+                        )
                     email = EmailOutbox(
                         user_id=owner,
                         meeting_id=identifier,
                         risk_id=risk.id,
-                        subject=f"Review meeting risk: {risk.title}"[:300]
+                        subject=(
+                            (
+                                "会议风险审核："
+                                if language == "zh"
+                                else "Review meeting risk: "
+                            )
+                            + risk.title
+                        )[:300]
                         .replace("\n", " ")
                         .replace("\r", " "),
                         body=body,

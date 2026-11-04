@@ -117,6 +117,32 @@ def normalize_due(
         return None
 
 
+def locate_evidence(analysis: MeetingExtraction, lines: list[TranscriptLine]) -> None:
+    """Repair offsets only when the unchanged quote has one exact source span.
+
+    Never normalize, paraphrase, shorten or synthesize source evidence. Ambiguous
+    quotes and unsupported claims still fail the same strict validator.
+    """
+    items: list[Person | Claim | RiskExtract | TaskExtract | MemoryClaim] = [
+        *analysis.people,
+        *analysis.decisions,
+        *analysis.risks,
+        *analysis.tasks,
+        *analysis.candidate_facts,
+        *analysis.memory_claims,
+    ]
+    for item in items:
+        e = item.evidence
+        width = e.quote.count("\n") + 1
+        matches = [
+            (i + 1, i + width)
+            for i in range(len(lines) - width + 1)
+            if e.quote in "\n".join(v.text for v in lines[i : i + width])
+        ]
+        if len(matches) == 1:
+            e.line_start, e.line_end = matches[0]
+
+
 def validate_evidence(analysis: MeetingExtraction, lines: list[TranscriptLine]) -> None:
     evidence_items: list[Person | Claim | RiskExtract | TaskExtract | MemoryClaim] = [
         *analysis.people,

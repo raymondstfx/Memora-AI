@@ -828,6 +828,12 @@ export interface components {
             date?: string | null;
             /** Timezone */
             timezone?: string | null;
+            /**
+             * Language
+             * @default zh
+             * @enum {string}
+             */
+            language: "zh" | "en";
         };
         /** ChatConfiguration */
         ChatConfiguration: {
@@ -844,6 +850,12 @@ export interface components {
         };
         /** ChatRequest */
         ChatRequest: {
+            /**
+             * Language
+             * @default zh
+             * @enum {string}
+             */
+            language: "zh" | "en";
             /** Conversation Id */
             conversation_id?: string | null;
             /**
@@ -946,7 +958,7 @@ export interface components {
             instruction: string;
             /**
              * Language
-             * @default en
+             * @default zh
              * @enum {string}
              */
             language: "en" | "zh";
@@ -1448,6 +1460,8 @@ export interface components {
         };
         /** RetryMeeting */
         RetryMeeting: {
+            /** Language */
+            language?: ("zh" | "en") | null;
             /** Date */
             date?: string | null;
             /** Timezone */
@@ -1455,6 +1469,12 @@ export interface components {
         };
         /** RetryRequest */
         RetryRequest: {
+            /**
+             * Language
+             * @default zh
+             * @enum {string}
+             */
+            language: "zh" | "en";
             /**
              * Request Id
              * Format: uuid
@@ -1546,6 +1566,10 @@ export interface components {
             memory_id?: string | null;
             /** Occurred At */
             occurred_at?: string | null;
+            /** Timezone */
+            timezone?: string | null;
+            /** Date Precision */
+            date_precision?: string | null;
             /** Line Start */
             line_start?: number | null;
             /** Line End */

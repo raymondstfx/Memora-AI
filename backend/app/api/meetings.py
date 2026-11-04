@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Annotated, cast
+from typing import Annotated, Literal, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
@@ -45,6 +45,7 @@ def emails(request: Request) -> EmailService:
 
 
 class RetryMeeting(BaseModel):
+    language: Literal["zh", "en"] | None = None
     model_config = ConfigDict(extra="forbid")
     date: str | None = None
     timezone: str | None = None
@@ -57,6 +58,7 @@ async def upload(
     file: Annotated[UploadFile, File()],
     date: Annotated[str | None, Form()] = None,
     timezone: Annotated[str | None, Form()] = None,
+    language: Annotated[Literal["zh", "en"], Form()] = "zh",
 ) -> MeetingUpload:
     service = meetings(request)
     try:
@@ -69,6 +71,7 @@ async def upload(
             content,
             date,
             timezone,
+            language,
         )
     finally:
         await file.close()
@@ -102,7 +105,9 @@ def audit_events(identifier: UUID, request: Request, owner: Owner) -> list[Audit
 def retry(
     identifier: UUID, body: RetryMeeting, request: Request, owner: Owner
 ) -> MeetingUpload:
-    return meetings(request).retry(owner, identifier, body.date, body.timezone)
+    return meetings(request).retry(
+        owner, identifier, body.date, body.timezone, body.language
+    )
 
 
 @router.get("/tasks", response_model=list[TaskOut])

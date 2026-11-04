@@ -11,6 +11,8 @@ from pydantic import (
     model_validator,
 )
 
+from app.services.language import response_language
+
 
 class Strict(BaseModel):
     model_config = ConfigDict(extra="forbid", from_attributes=True)
@@ -36,12 +38,17 @@ class WebSearchResult(Strict):
 class DeckRequest(Strict):
     request_key: UUID
     instruction: str = Field(min_length=5, max_length=2000)
-    language: Literal["en", "zh"] = "en"
+    language: Literal["en", "zh"] = "zh"
     slide_count: int = Field(ge=1, le=12)
     document_ids: list[UUID] = Field(default_factory=list, max_length=5)
     meeting_ids: list[UUID] = Field(default_factory=list, max_length=5)
     use_memories: bool = True
     web_query: str | None = Field(default=None, min_length=2, max_length=500)
+
+    @model_validator(mode="after")
+    def requested_language(self) -> "DeckRequest":
+        self.language = response_language(self.instruction, self.language)  # type: ignore[assignment]
+        return self
 
     @field_validator("instruction")
     @classmethod
@@ -49,6 +56,13 @@ class DeckRequest(Strict):
         if len(value.strip()) < 5:
             raise ValueError("Instruction needs at least five nonblank characters")
         return value.strip()
+
+
+class Statement(Strict):
+    kind: Literal["fact", "inference", "suggestion"]
+    source_ref: str
+    quote: str = Field(min_length=1, max_length=65)
+    text: str = Field(default="", max_length=65)
 
 
 class Slide(Strict):
@@ -66,6 +80,7 @@ class Slide(Strict):
     speaker_notes: str = Field(default="", max_length=1200)
     visual_spec: Literal["none"] = "none"
     source_refs: list[str] = Field(default_factory=list, max_length=5)
+    statements: list[Statement] = Field(default_factory=list, max_length=3)
 
     @model_validator(mode="after")
     def bounded(self) -> "Slide":
@@ -88,6 +103,25 @@ class Outline(Strict):
         if len(self.slides) != self.slide_count:
             raise ValueError("Slide count must exactly match")
         return self
+
+
+class PlannedSlide(Strict):
+    type: Literal[
+        "cover",
+        "section",
+        "bullets",
+        "two_column",
+        "timeline",
+        "risk_matrix",
+        "summary",
+    ]
+    title: str = Field(min_length=1, max_length=90)
+    statements: list[Statement] = Field(min_length=1, max_length=3)
+
+
+class PlannedOutline(Strict):
+    presentation_title: str = Field(min_length=1, max_length=100)
+    slides: list[PlannedSlide] = Field(min_length=1, max_length=12)
 
 
 class DeckOut(Strict):

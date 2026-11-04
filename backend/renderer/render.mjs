@@ -42,6 +42,6 @@ for (const [i, item] of outline.slides.entries()) {
   if(refs.some(s=>!s))throw Error("INVALID_SOURCE");
   text(refs.map((s,j)=>`[${j+1}] ${s.title.slice(0,18)}`).join(" | "),{x:0.7,y:6.65,w:11.7,h:0.4,fontSize:9});
   text(`${i+1} / ${outline.slide_count}`,{x:11.8,y:7.08,w:1,h:0.2,fontSize:10});
-  slide.addNotes([item.speaker_notes,...refs.map(s=>JSON.stringify(s))].join("\n"));
+  slide.addNotes([item.speaker_notes,JSON.stringify(item.statements||[]),...refs.map(s=>JSON.stringify(s))].join("\n"));
 }
 await pptx.writeFile({fileName:output});

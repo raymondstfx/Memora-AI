@@ -82,7 +82,12 @@ async def retry(
     message_id: UUID, body: RetryRequest, request: Request, owner: Owner
 ) -> StreamingResponse:
     turn = await run_in_threadpool(
-        service(request).prepare, owner, None, body.request_id, message_id
+        service(request).prepare,
+        owner,
+        None,
+        body.request_id,
+        message_id,
+        body.language,
     )
     return response(request, turn)
 

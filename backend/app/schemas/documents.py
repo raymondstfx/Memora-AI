@@ -67,6 +67,8 @@ class SourceCitation(BaseModel):
     meeting_id: UUID | None = None
     memory_id: UUID | None = None
     occurred_at: datetime | None = None
+    timezone: str | None = None
+    date_precision: str | None = None
     line_start: int | None = None
     line_end: int | None = None
     memory_status: str | None = None

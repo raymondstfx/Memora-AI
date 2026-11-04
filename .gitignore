@@ -61,3 +61,17 @@ appendonlydir/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Local-only contributor instructions, archives and process material
+/.private/
+/AGENTS.md
+/docs/runbook.md
+/docs/api/phase-*.md
+/docs/architecture/phase-*-plan.md
+/docs/evals/
+/docs/screenshots/phase-6/
+/backend/app/agents/README.md
+/backend/app/services/README.md
+/backend/app/workers/README.md
+/ppt-worker/README.md
+/demo-data/README.md

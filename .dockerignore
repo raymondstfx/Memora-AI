@@ -31,3 +31,8 @@ secrets
 **/service-account*.json
 .aws
 backend/tests
+
+# Local contributor notes and private archives are not build inputs.
+.private
+AGENTS.md
+**/AGENTS.md

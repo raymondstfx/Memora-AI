@@ -2,24 +2,29 @@
 
 **A connected workspace for information, understanding, and action.**
 
+界面已按 Cognitive Minimal 设计资料完成统一适配，保留中英文与真实业务接口。
+本地检查地址：[MemoraAI](http://localhost:5173)。全部设计对应、验证结果及差异见
+[前端设计适配验收](docs/evals/frontend-design.md)。本轮未提交、推送或远程部署。
+
 Memora AI is being built as a local-first AI knowledge workspace, bringing
 conversations, document evidence, meeting insights, durable memory, approved
 actions, and editable presentations into one place.
 
+**PPT 定向修复状态：** 已改为逐条证据绑定，网站运行于 http://localhost:5173 。本轮真实 Gemini 2 次，仍存在网页引文不精确，未发布新成品；见 [详细原因与验收](docs/evals/ppt-content-acceptance.md)。
+
 **Current source: Phase 6 — local hardening and acceptance review.**
 
-Phase 6 is now loaded in the **local running services** after the owner's
-2026-11-04 acceptance update. Configuration, data and indexes were preserved;
-no commit/push or remote deployment was performed.
+本地服务现已加载验收修复及中英文界面：默认简体中文，顶部可切换 English，选择会保存。
+界面语言不会翻译已有内容；新聊天、会议摘要、邮件草稿和 PPT 使用提交时的语言，明确语言要求优先。
 
-Latest real results: Tavily search and six-slide file generation passed. Gemini
-meeting HTTP 503 did not recur (HTTP 200), but structured/evidence validation
-still failed. The generated deck also needs date/role content corrections; the
-two-real-meeting temporal gate remains pending. See the
-[final acceptance report and direct demo steps](docs/evals/final-acceptance.md).
-Earlier independent-Provider A01–A22 results are in
-[Phase 6](docs/evals/phase-6.md); the [runbook](docs/runbook.md) preserves setup and
-recovery instructions.
+最新结果：第二次真实会议提取及两次会议的跨会话 Nov 5 → Nov 8 问答已通过。
+五条已保存的真实网页来源可在原预算内进入规划请求。**真实六页成品内容仍未通过验收**：
+保存的大纲加强了行动承诺并添加无证据的频率表述，最终守卫拒绝发布；私有六页审阅副本不是正式成品。
+本轮真实调用共 Gemini 3 次，Tavily/Embedding/外部 SMTP 为 0；没有重建索引。
+
+[最新验收结果与中文演示步骤](docs/evals/final-acceptance.md) · [运行手册](docs/runbook.md) ·
+[历史 Phase 6 报告](docs/evals/phase-6.md)。本次未提交、推送或远程部署。
+
 Chat streams through a backend provider adapter, saves conversations and partial
 responses in Postgres, and restores history on reload/restart. LangGraph
 checkpoints persist server-side. Missing credentials produce a configuration
@@ -643,3 +648,16 @@ Development stops at each phase gate for owner approval. See [AGENTS.md](AGENTS.
 for contributor commands and migration discipline. Phase 3 is the current boundary;
 Phase 4 and publication of this phase require separate owner approval.
 See [the Phase 3 API contract](docs/api/phase-3.md).
+
+## 中文 / English
+
+顶部语言选择保存在 `localStorage["memora.language"]`，默认 `zh`。统一界面词典位于
+`frontend/src/i18n.ts` 和 `frontend/src/locales/`；日期/数字使用 `Intl`，会议保留原 IANA 时区与日期精度。
+聊天 JSON 的 `language`、会议表单/失败重试的 `language`、PPT 请求的 `language` 传到后端。
+后台会议和 PPT 保存提交时语言，用户切换界面不会改变运行中的任务或重新生成历史内容。
+引用、姓名、原始文件及已保存业务内容保持原文。模型正文不遵循指定语言时明确失败；
+语言元数据由提交请求决定，不通过改写模型正文强行通过。
+
+零额外模型消耗的中文演示可直接打开
+[已保存的真实时间变化会话](http://localhost:5173/?conversation=3318a23d-1a18-45ac-92c4-76ad8bd85192)。
+邮件仅使用本地 Mailpit；当前真实 PPT 任务仍失败，详见验收报告，不应把旧文件作为修复后成品。

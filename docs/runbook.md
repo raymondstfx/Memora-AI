@@ -1,11 +1,29 @@
 # Memora AI local operator runbook
 
-**Latest status, 2026-11-04:** the owner-authorized local rebuild is complete.
-Tavily is configured and real search passed. One real six-slide mixed-source
-artifact is available with factual corrections still required; second meeting
-validation remains failed. Use [final report/demo steps](evals/final-acceptance.md)
-for current results; the original Phase 6 instructions below retain their dated
-acceptance context. No commit, push or remote deployment has been performed.
+**当前状态（2026-11-04）：** 本地最终修复版已加载，默认中文，可持久切换 English。
+第二次真实会议和跨会话时间变化问答通过；真实 PPT 内容仍失败，守卫拒绝发布。
+本轮 Gemini 3 次，其余外部服务 0 次；保留全部配置、数据与索引。
+以[最终验收与中文演示](evals/final-acceptance.md)为准。下方旧日期说明保留为历史。
+
+### 本次缓存镜像更新说明
+
+服务已运行，直接打开网页即可，不必再次请求注册表。最后一次完整构建因 Docker Hub 连接超时失败；
+本次在依赖完全未变且本地已有验证镜像的前提下，用临时 Dockerfile 只复制最终后端源码及经检查的 Vite 静态产物，
+然后执行 `docker compose --profile app --profile mail up -d --no-build --wait`。源码指纹、静态资源、健康与数据保留均已核对。
+临时文件及构建证据在本地 `logs/`，不发布。不要为解决镜像网络问题删除数据库卷、覆盖 .env 或重建索引。
+该路径不替代恢复网络后的正常 Dockerfile 完整构建，也不代表更换或重新验证了依赖。
+
+### 当前中文操作路径
+
+1. `docker compose --profile app --profile mail up --build -d --wait`；不要删除正常项目的卷或覆盖现有 `.env`。
+2. 打开 http://localhost:5173，顶部“中文 / English”切换；刷新验证选择保存。
+3. 打开验收报告中的已保存时间变化会话，查看 Alex、Nov 5 / Nov 8 和两次会议证据，不重复请求模型。
+4. 会议页检查第二次会议已就绪、日期与时区、原文证据和未批准草稿；记忆页选全部历史查看新旧版本。
+5. 邮件保持 local 和外部发送 false，仅允许本地 Mailpit 演示。
+6. PPT 真实内容没有通过，当前任务失败。只能把私有六页副本用于问题审阅，不能当作验收成品。
+
+语言保存于每次提交；重复上传不为切换语言创建重复会议或邮件。旧内容不自动翻译。
+更换模型或向量维度、重建索引、清空数据、追加真实调用，都不属于本次收尾操作。
 
 Phase 6 local delivery, 2026-11-03 (Asia/Shanghai). This is a single-user,
 loopback-only demonstration. Public authentication and public deployment are not

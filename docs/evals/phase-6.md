@@ -1,3 +1,7 @@
+> 最新定向修复：逐条事实/推断/建议证据绑定已实施，100 单元测试及六页测试 Provider 链路通过；本轮真实 Gemini 2 次，仍因第 5 页省略号引文不匹配而拒绝发布。网站已启动。详情见 [PPT 内容验收](ppt-content-acceptance.md)。以下保留此前记录。
+
+> 2026-11-04 最新修复结论：99 单元测试、累计 37 个受影响集成用例及 5 个双语浏览器用例通过；第二次真实会议与跨会话时间变化已通过。真实六页成品内容仍失败并被拒绝发布。实际 Gemini 3 次，其余外部请求 0 次。以下为历史阶段报告；本轮精确命令、逐页审阅、保留项及中文演示见 [final-acceptance.md](final-acceptance.md)。没有重跑未受影响的全套基础设施验收，没有新迁移、提交、推送或远程部署。
+
 # Phase 6 acceptance and delivery report
 
 **2026-11-04 follow-up:** local services now load Phase 6. Real Tavily passed;
@@ -199,3 +203,28 @@ wait for loaded content and show no horizontal overflow on critical pages.
 
 Complete reproduction, manual startup and safe recovery: ../runbook.md. Stop
 here; no commit, push or deployment until the owner's next explicit instruction.
+
+
+## 2026-11-04 最终修复的实际验证
+
+- 根目录 `.venv/Scripts/python scripts/dev.py check`：Ruff 检查/格式、mypy（55 个源文件）、99 单元测试通过；52 集成用例 deselected，不计通过。
+- `.venv/Scripts/python scripts/dev.py export-api`，frontend `npm.cmd run api:types`、`npm.cmd run check`、`npm.cmd run build`：通过。
+- `.venv/Scripts/python -X utf8 scripts/test_acceptance_i18n.py`：分次受影响集成选择累计 37 个用例，修复失败后复验；最后版本仅再选 `tests/integration/test_phase5.py`，完整六页测试 Provider 链路 1/1 通过。未重复未受影响的全套基础设施验收。
+- frontend（`TEST_BASE_URL=http://127.0.0.1:55273`、`PLAYWRIGHT_CHANNEL=msedge`）`npm.cmd exec playwright test i18n.spec.ts -- --workers=1`：原隔离用例 4/4 通过；新增非 JSON 故障用例在正常服务上拦截响应后 1/1 通过，累计 5 个不同浏览器用例。
+- `docker compose --profile app --profile mail up --build -d --wait --wait-timeout 180`：正常六个服务健康，迁移成功，仍为 0006_presentations，无新结构变更。
+- 保存的实际响应离线回放、Poppler 六页视觉检查、原生文本独立副本 LibreOffice 重新打开：文件属性可验证，但正常任务因事实不忠实保持 failed，没有发布成品。
+- 真实外部请求：Gemini 3（会议 1、大纲 2，均 HTTP 200）；Tavily / Embedding / 外部 SMTP 0；没有自动重试、换模型或重新建立索引。
+- 所有原有业务行 ID、索引配置、首次会议摘要和 .env 散列保留；运行源码/镜像与最终版本一致。真实会议时间变化验收通过，真实六页内容仍失败。详见最新 [最终报告](final-acceptance.md)。
+
+最后一次镜像更新遇到 Docker Hub 连接超时，该次完整构建不记通过。使用已有已验证的依赖镜像，仅复制最终后端源码及经 Vite 构建/密钥扫描的前端静态产物，临时镜像层构建成功；`docker compose --profile app --profile mail up -d --no-build --wait` 和前端单独更新通过。最终只读指纹/健康/数据保留检查通过。真实业务调用计数仍为 Gemini 3，其余 0。
+
+
+## 2026-11-04 前端设计适配补充
+
+递归核对全部六套 code/screen、共用 DESIGN 与产品说明；完成七个原业务页与产品概览的统一适配。
+详细目录映射、改动、差异、命令及演示见 [frontend-design.md](frontend-design.md)。
+`npm.cmd run check`、`npm.cmd run build` 通过；生产前端上的 `tests/design.spec.ts --workers=1`
+为 8/8（0 跳过，25.1 秒），包含 48 组双语/响应式页面状态。正常服务只读截图 32 组，
+无脚本异常、无整页横向溢出、0 次写接口请求。数据/配置/索引保持检查通过，六项服务健康。
+本轮 Gemini、Embedding、Tavily、SMTP 实际请求均 0；没有重新验收或覆盖此前真实 PPT 内容失败，
+没有修改后端业务、重建索引或清理数据；未提交、推送、远程部署。
